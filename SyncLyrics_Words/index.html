@@ -718,6 +718,51 @@
     text-align: center;
     box-sizing: border-box;
   }
+  /* INFO PANEL TABS */
+  .info-panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    margin: -16px -18px 14px;
+  }
+  .info-panel-tab {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 10px 14px;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .info-panel-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .info-panel-tab:hover { color: var(--text); }
+  .info-tab-content { display: none; }
+  .info-tab-content.active { display: block; }
+  .other-tool-item {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .other-tool-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .other-tool-name {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    text-decoration: none;
+    letter-spacing: 1px;
+    display: block;
+    margin-bottom: 4px;
+    transition: opacity 0.15s;
+  }
+  .other-tool-name:hover { opacity: 0.75; text-decoration: underline; }
+  .other-tool-desc {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
 
   /* ─── SYNC BUTTON PAD ─────────────────────────────────────────────────────── */
   #syncButtonPad {
@@ -1019,18 +1064,29 @@
     <div class="info-icon-wrapper" id="infoWrapper" onmouseenter="showInfoPanel()" onmouseleave="hideInfoPanel()" onclick="toggleInfoPanel()">
       <span class="info-icon" style="font-size:24px;border:1px solid var(--border);padding:6px 10px;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">ⓘ</span>
       <div class="info-panel" id="infoPanel">
-        <div class="info-panel-title">HOW TO USE</div>
-        <div class="info-panel-item" style="margin-bottom:10px;">
-          <span>Use <a href="https://genius.com/toxi" target="_blank" style="color:var(--accent);text-decoration:underline;">Toxi</a>'s <a href="https://toxiplays.github.io/ttmlrenderer/" target="_blank" style="color:var(--accent);text-decoration:underline;">TTML Renderer</a> to view your TTML files.</span>
+        <div class="info-panel-tabs">
+          <button class="info-panel-tab active" data-tab="how-to-use" onclick="switchInfoTab('how-to-use')">How to use</button>
+          <button class="info-panel-tab" data-tab="other-tools" onclick="switchInfoTab('other-tools')">Other Tools</button>
         </div>
-        <div class="info-panel-item">
-          <span class="info-panel-key">\</span>
-          <span>Insert <b>\</b> between characters to split a word into multiple sync units while keeping the original display.<br>
-          Example: <b>Do\ra\e\mon</b> → synced as <b>Do · ra · e · mon</b>, displayed as <b>Doraemon</b>.</span>
+        <div class="info-tab-content active" data-tab="how-to-use">
+          <div class="info-panel-item" style="margin-bottom:10px;">
+            <span>Use <a href="https://genius.com/toxi" target="_blank" style="color:var(--accent);text-decoration:underline;">Toxi</a>'s <a href="https://toxiplays.github.io/ttmlrenderer/" target="_blank" style="color:var(--accent);text-decoration:underline;">TTML Renderer</a> to view your TTML files.</span>
+          </div>
+          <div class="info-panel-item">
+            <span class="info-panel-key">\</span>
+            <span>Insert <b>\</b> between characters to split a word into multiple sync units while keeping the original display.<br>
+            Example: <b>Do\ra\e\mon</b> → synced as <b>Do · ra · e · mon</b>, displayed as <b>Doraemon</b>.</span>
+          </div>
+          <div class="info-panel-item" style="margin-top:10px;">
+            <span class="info-panel-key">...</span>
+            <span>Entering <b>...</b> (ellipsis) in the lyrics will represent a section without lyrics. When exported, the ellipsis will be split into three separate dots spaced evenly apart.</span>
+          </div>
         </div>
-        <div class="info-panel-item" style="margin-top:10px;">
-          <span class="info-panel-key">...</span>
-          <span>Entering <b>...</b> (ellipsis) in the lyrics will represent a section without lyrics. When exported, the ellipsis will be split into three separate dots spaced evenly apart.</span>
+        <div class="info-tab-content" data-tab="other-tools">
+          <div class="other-tool-item">
+            <a class="other-tool-name" href="https://ellinya19.github.io/Ellinya/SyncLyrics_Lines/index.html" target="_blank">Line Level Timing Tool</a>
+            <span class="other-tool-desc">Sync lyrics at the line level — mark start &amp; end times for each lyric line.</span>
+          </div>
         </div>
       </div>
     </div>
@@ -3841,10 +3897,15 @@ document.addEventListener('click', (e) => {
 });
 
 let infoPanelOpen = false;
-function showInfoPanel() { document.getElementById('infoPanel').classList.add('visible'); }
+function switchInfoTab(tab) {
+  document.querySelectorAll('.info-panel-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.info-tab-content').forEach(c => c.classList.toggle('active', c.dataset.tab === tab));
+}
+function showInfoPanel() { switchInfoTab('how-to-use'); document.getElementById('infoPanel').classList.add('visible'); }
 function hideInfoPanel() { if (!infoPanelOpen) document.getElementById('infoPanel').classList.remove('visible'); }
 function toggleInfoPanel() {
   infoPanelOpen = !infoPanelOpen;
+  if (infoPanelOpen) switchInfoTab('how-to-use');
   document.getElementById('infoPanel').classList.toggle('visible', infoPanelOpen);
 }
 </script>
