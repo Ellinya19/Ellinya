@@ -1313,13 +1313,13 @@
 <div class="modal-overlay" id="ttmlImportModal">
   <div class="modal" style="max-width:480px;">
     <div class="modal-header">
-      <h2 style="color:var(--s06-color);">Import TTML</h2>
+      <h2 id="ttmlImportModalTitle" style="color:var(--s06-color);">Import TTML</h2>
     </div>
-    <div class="modal-body" style="padding:28px 24px;">
+    <div class="modal-body" style="padding:28px 24px;" id="ttmlImportModalBody">
       <p style="font-size:14px;line-height:1.8;color:var(--text);">Do you want to <b style="color:var(--s06-color);">keep the timing</b> from the TTML file?</p>
       <p style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.7;">— <b>Yes</b>: Lyrics will be included with full timing (already synced).<br>— <b>No</b>: Keep only plain text, without timing.</p>
     </div>
-    <div class="modal-footer" style="justify-content:center;gap:16px;">
+    <div class="modal-footer" style="justify-content:center;gap:16px;" id="ttmlImportModalFooter">
       <button class="btn primary" style="min-width:100px;background:var(--s06-color);border-color:var(--s06-color);" onclick="confirmTTMLImport(true)">✓ Yes</button>
       <button class="btn danger" style="min-width:100px;" onclick="confirmTTMLImport(false)">✕ No</button>
     </div>
@@ -1521,6 +1521,21 @@ function handleLoadOrUpdateBV() {
 // ─── TTML IMPORT ─────────────────────────────────────────────────────────────
 let _pendingTTMLContent = null;
 
+function detectTTMLSyncLevel(xmlText) {
+  // Trả về 'word' nếu bất kỳ <span> nào có begin/end attribute, ngược lại là 'line'
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlText, 'application/xml');
+    const ns = 'http://www.w3.org/ns/ttml';
+    let spans = Array.from(doc.getElementsByTagNameNS(ns, 'span'));
+    if (!spans.length) spans = Array.from(doc.querySelectorAll('span'));
+    for (const sp of spans) {
+      if (sp.hasAttribute('begin') || sp.hasAttribute('end')) return 'word';
+    }
+    return 'line';
+  } catch(e) { return 'word'; }
+}
+
 function importTTML(input) {
   const file = input.files[0];
   if (!file) return;
@@ -1528,6 +1543,28 @@ function importTTML(input) {
   const reader = new FileReader();
   reader.onload = (e) => {
     _pendingTTMLContent = e.target.result;
+    const level = detectTTMLSyncLevel(_pendingTTMLContent);
+    if (level === 'line') {
+      // Line-level: hiện thông báo, không cho chọn timing
+      document.getElementById('ttmlImportModalTitle').textContent = 'Import TTML — Line Level';
+      document.getElementById('ttmlImportModalTitle').style.color = 'var(--accent2)';
+      document.getElementById('ttmlImportModalBody').innerHTML = `
+        <p style="font-size:14px;line-height:1.8;color:var(--text);">This file is synced at <b style="color:var(--accent2);">Line Level</b> — no word-by-word timing.</p>
+        <p style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.7;">The system will only extract the plain text (without timing) for you to re-sync.</p>`;
+      document.getElementById('ttmlImportModalFooter').innerHTML = `
+        <button class="btn primary" style="min-width:100px;background:var(--s06-color);border-color:var(--s06-color);" onclick="confirmTTMLImport(false)">✓ OK</button>
+        <button class="btn" style="min-width:100px;" onclick="document.getElementById('ttmlImportModal').classList.remove('visible');_pendingTTMLContent=null;">✕ Huỷ</button>`;
+    } else {
+      // Word-level: hiện modal bình thường
+      document.getElementById('ttmlImportModalTitle').textContent = 'Import TTML';
+      document.getElementById('ttmlImportModalTitle').style.color = 'var(--s06-color)';
+      document.getElementById('ttmlImportModalBody').innerHTML = `
+        <p style="font-size:14px;line-height:1.8;color:var(--text);">Do you want to <b style="color:var(--s06-color);">keep the timing</b> from the TTML file?</p>
+        <p style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.7;">— <b>Yes</b>: Lyrics will be included with full timing (already synced).<br>— <b>No</b>: Keep only plain text, without timing.</p>`;
+      document.getElementById('ttmlImportModalFooter').innerHTML = `
+        <button class="btn primary" style="min-width:100px;background:var(--s06-color);border-color:var(--s06-color);" onclick="confirmTTMLImport(true)">✓ Yes</button>
+        <button class="btn danger" style="min-width:100px;" onclick="confirmTTMLImport(false)">✕ No</button>`;
+    }
     document.getElementById('ttmlImportModal').classList.add('visible');
   };
   reader.readAsText(file);
