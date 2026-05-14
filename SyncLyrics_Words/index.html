@@ -1558,7 +1558,7 @@ function importTTML(input) {
         <p style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.7;">The system will only extract the plain text (without timing) for you to re-sync.</p>`;
       document.getElementById('ttmlImportModalFooter').innerHTML = `
         <button class="btn primary" style="min-width:100px;background:var(--s06-color);border-color:var(--s06-color);" onclick="confirmTTMLImport(false)">✓ OK</button>
-        <button class="btn" style="min-width:100px;" onclick="document.getElementById('ttmlImportModal').classList.remove('visible');_pendingTTMLContent=null;">✕ Huỷ</button>`;
+        <button class="btn" style="min-width:100px;" onclick="document.getElementById('ttmlImportModal').classList.remove('visible');_pendingTTMLContent=null;">✕ Cancel</button>`;
     } else {
       // Word-level: hiện modal bình thường
       document.getElementById('ttmlImportModalTitle').textContent = 'Import TTML';
@@ -1713,6 +1713,17 @@ function parseTTMLContent(xmlText, keepTiming) {
         if (tokens.length) {
           if (isRight) rvLines.push(tokens);
           else mainLines.push(tokens);
+        }
+      } else {
+        // Line Level: <p> chứa text trực tiếp, không có <span> con có timing
+        const rawText = p.textContent.trim();
+        if (rawText) {
+          const words = rawText.split(/\s+/).filter(w => w.length > 0);
+          const tokens = words.map(w => ({ text: w, noSpaceBefore: false }));
+          if (tokens.length) {
+            if (isRight) rvLines.push(tokens);
+            else mainLines.push(tokens);
+          }
         }
       }
 
