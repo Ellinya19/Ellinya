@@ -1065,8 +1065,8 @@
       <span class="info-icon" style="font-size:24px;border:1px solid var(--border);padding:6px 10px;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">ⓘ</span>
       <div class="info-panel" id="infoPanel">
         <div class="info-panel-tabs">
-          <button class="info-panel-tab active" data-tab="how-to-use" onclick="switchInfoTab('how-to-use')">How to use</button>
-          <button class="info-panel-tab" data-tab="other-tools" onclick="switchInfoTab('other-tools')">Other Tools</button>
+          <button class="info-panel-tab active" data-tab="how-to-use" onclick="switchInfoTab('how-to-use');event.stopPropagation()">How to use</button>
+          <button class="info-panel-tab" data-tab="other-tools" onclick="switchInfoTab('other-tools');event.stopPropagation()">Other Tools</button>
         </div>
         <div class="info-tab-content active" data-tab="how-to-use">
           <div class="info-panel-item" style="margin-bottom:10px;">
