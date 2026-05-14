@@ -1522,15 +1522,20 @@ function handleLoadOrUpdateBV() {
 let _pendingTTMLContent = null;
 
 function detectTTMLSyncLevel(xmlText) {
-  // Trả về 'word' nếu bất kỳ <span> nào có begin/end attribute, ngược lại là 'line'
+  // Trả về 'word' nếu có <span> con trực tiếp của <p> có begin/end → Word Level
+  // Trả về 'line' nếu chỉ <p> có begin/end mà không có <span> có timing → Line Level
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(xmlText, 'application/xml');
     const ns = 'http://www.w3.org/ns/ttml';
-    let spans = Array.from(doc.getElementsByTagNameNS(ns, 'span'));
-    if (!spans.length) spans = Array.from(doc.querySelectorAll('span'));
-    for (const sp of spans) {
-      if (sp.hasAttribute('begin') || sp.hasAttribute('end')) return 'word';
+    let pEls = Array.from(doc.getElementsByTagNameNS(ns, 'p'));
+    if (!pEls.length) pEls = Array.from(doc.querySelectorAll('p'));
+    for (const p of pEls) {
+      const children = Array.from(p.children);
+      for (const child of children) {
+        const tag = child.localName || child.nodeName.split(':').pop();
+        if (tag === 'span' && (child.hasAttribute('begin') || child.hasAttribute('end'))) return 'word';
+      }
     }
     return 'line';
   } catch(e) { return 'word'; }

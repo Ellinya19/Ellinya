@@ -3237,41 +3237,12 @@ function exportTTML() {
     const pe = toTTMLTime(nextEntry ? nextEntry[1][0].begin : rawEnd);
     const hasDotGroup = lineWords.some(w => w.isDotGroup);
     let mainSpans;
-    if (hasDotGroup) {
-      mainSpans = lineWords.map((w, wi) => {
-        if (w.isDotGroup) {
-          const tStart = w.begin !== null ? w.begin : 0;
-          const nextEntryForDot = lineEntries[entryIdx + 1];
-          const nextWordBegin = nextEntryForDot ? nextEntryForDot[1][0].begin : null;
-          const tEnd = nextWordBegin !== null ? nextWordBegin - 0.1 : (tStart + 1.5);
-          const step = (tEnd - tStart) / 3;
-          const prevW = lineWords[wi - 1];
-          const noSpaceDot = wi > 0 && prevW && prevW.text && prevW.text.endsWith('-');
-          const dotSep = noSpaceDot ? '' : (wi > 0 ? ' ' : '');
-          return dotSep + [0, 1, 2].map(di => {
-            const b = toTTMLTime(tStart + di * step);
-            const e = toTTMLTime(tStart + (di + 1) * step);
-            return `<span begin="${b}" end="${e}">.</span>`;
-          }).join('');
-        }
-        const b = toTTMLTime(w.begin);
-        const e = toTTMLTime(w.end !== null ? w.end : w.begin + 0.12);
-        const prevW = lineWords[wi - 1];
-        const noSpace = false;
-        const sep = noSpace ? '' : (wi > 0 ? ' ' : '');
-        return sep + `<span begin="${b}" end="${e}">${escapeXML(w.ttmlText || w.text)}</span>`;
-      }).join('');
-    } else {
-      mainSpans = lineWords.map((w, wi) => {
-        const b = toTTMLTime(w.begin);
-        const e = toTTMLTime(w.end !== null ? w.end : w.begin + 0.12);
-        const span = `<span begin="${b}" end="${e}">${escapeXML(w.ttmlText || w.text)}</span>`;
-        const prevW = lineWords[wi - 1];
-        const noSpace = false;
-        const sep = noSpace ? '' : (wi > 0 ? ' ' : '');
-        return sep + span;
-      }).join('');
-    }
+    mainSpans = lineWords.map((w, wi) => {
+      const prevW = lineWords[wi - 1];
+      const noSpaceDot = wi > 0 && prevW && prevW.text && prevW.text.endsWith('-');
+      const sep = noSpaceDot ? '' : (wi > 0 ? ' ' : '');
+      return sep + escapeXML(w.isDotGroup ? '...' : (w.ttmlText || w.text));
+    }).join('');
     // Attach BV lines as inline x-bg spans inside this <p>
 let bvSpans = '';
 let bvSeparatePTags = '';
@@ -3283,8 +3254,6 @@ if (hasBV && bvLineMap[key]) {
     const bvPb = toTTMLTime(bvLine[0].begin);
     const bvPe = toTTMLTime(bvLine[bvLine.length - 1].end || bvLine[bvLine.length - 1].begin + 0.12);
     const innerSpans = bvLine.map((w, wi) => {
-      const b = toTTMLTime(w.begin);
-      const e = toTTMLTime(w.end !== null ? w.end : w.begin + 0.12);
       const prevW = bvLine[wi - 1];
       const noSpace = wi > 0 && (
         (w.isHyphenPart) ||
@@ -3292,7 +3261,7 @@ if (hasBV && bvLineMap[key]) {
         (prevW && prevW.text && prevW.text.endsWith('-'))
       );
       const sep = noSpace ? '' : (wi > 0 ? ' ' : '');
-      return `${sep}<span begin="${b}" end="${e}">${escapeXML(w.ttmlText || w.text)}</span>`;
+      return sep + escapeXML(w.ttmlText || w.text);
     }).join('');
     return `      <span ttm:role="x-bg" begin="${bvPb}" end="${bvPe}">${innerSpans}</span>`;
   }).join('\n');
@@ -3332,12 +3301,8 @@ return mainPTag;
       const rawEnd = lineWords[lineWords.length-1].end || lineWords[lineWords.length-1].begin + 0.5;
       const pe = toTTMLTime(nextEntry ? nextEntry[1][0].begin : rawEnd);
       const spans = lineWords.map((w, wi) => {
-        const b = toTTMLTime(w.begin);
-        const e = toTTMLTime(w.end !== null ? w.end : w.begin + 0.12);
-        const prevW = lineWords[wi - 1];
-        const noSpace = false;
-        const sep = noSpace ? '' : (wi > 0 ? ' ' : '');
-        return `${sep}<span begin="${b}" end="${e}">${escapeXML(w.ttmlText || w.text)}</span>`;
+        const sep = wi > 0 ? ' ' : '';
+        return sep + escapeXML(w.ttmlText || w.text);
       }).join('');
 
       // Attach BV that belongs to this RV line as x-bg
@@ -3345,12 +3310,10 @@ return mainPTag;
       if (bvLineMapRV[key]) {
         rvBvSpans = bvLineMapRV[key].slice().sort((a, b) => a[0].begin - b[0].begin).map(bvLine => {
           const innerSpans = bvLine.map((w, wi) => {
-            const b = toTTMLTime(w.begin);
-            const e = toTTMLTime(w.end !== null ? w.end : w.begin + 0.12);
             const prevW = bvLine[wi - 1];
             const noSpace = wi > 0 && ((w.isHyphenPart) || (w.isBsPart && w.bsIndex > 0) || (prevW && prevW.text && prevW.text.endsWith('-')));
             const sep = noSpace ? '' : (wi > 0 ? ' ' : '');
-            return `${sep}<span begin="${b}" end="${e}">${escapeXML(w.ttmlText || w.text)}</span>`;
+            return sep + escapeXML(w.ttmlText || w.text);
           }).join('');
           return `<span ttm:role="x-bg">${innerSpans}</span>`;
         }).join('');
@@ -3362,7 +3325,7 @@ return mainPTag;
 
   const allPTags = rvPTags ? pTags + '\n' + rvPTags : pTags;
 
-  const ttml = `<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns:tts="http://www.w3.org/ns/ttml#styling" xmlns:amll="http://www.example.com/ns/amll" xmlns:itunes="http://music.apple.com/lyric-ttml-internal" itunes:timing="Word"><!-- The TTML was created using Ellinya's tool --><head><metadata>${agentMeta}</metadata></head><body dur="${durStr}"><div begin="${firstBegin}" end="${lastEnd}">\n${allPTags}\n    </div></body></tt>`;
+  const ttml = `<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns:tts="http://www.w3.org/ns/ttml#styling" xmlns:amll="http://www.example.com/ns/amll" xmlns:itunes="http://music.apple.com/lyric-ttml-internal" itunes:timing="Line"><!-- The TTML was created using Ellinya's tool --><head><metadata>${agentMeta}</metadata></head><body dur="${durStr}"><div begin="${firstBegin}" end="${lastEnd}">\n${allPTags}\n    </div></body></tt>`;
 
   document.getElementById('ttmlOutput').textContent = ttml;
   document.getElementById('modalOverlay').classList.add('visible');
