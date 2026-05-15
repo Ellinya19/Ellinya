@@ -1576,6 +1576,22 @@ function parseTTMLContent(xmlText, keepTiming) {
       return s ? parseFloat(s[1]) : 0;
     }
 
+    // Detect word-level: nếu >= 2 span trong bất kỳ p nào đều có begin/end riêng → word-level
+    let isWordLevel = false;
+    if (keepTiming) {
+      for (const p of pEls) {
+        const directSpans = Array.from(p.children).filter(el => {
+          const role = el.getAttributeNS ? el.getAttributeNS(ttmNS,'role') : el.getAttribute('ttm:role');
+          return (el.localName||el.nodeName.split(':').pop()) === 'span' && role !== 'x-bg';
+        });
+        const spansWithTiming = directSpans.filter(sp => sp.getAttribute('begin') && sp.getAttribute('end'));
+        if (directSpans.length >= 2 && spansWithTiming.length >= 2) {
+          isWordLevel = true;
+          break;
+        }
+      }
+    }
+
     function spansToText(spanEls, withTiming) {
       const spanArr = Array.from(spanEls).filter(sp => {
         const role = sp.getAttributeNS ? sp.getAttributeNS(ttmNS,'role') : sp.getAttribute('ttm:role');
@@ -1663,8 +1679,16 @@ function parseTTMLContent(xmlText, keepTiming) {
       });
 
       if (directSpans.length) {
-        const tokens = spansToText(directSpans, keepTiming);
+        let tokens = spansToText(directSpans, keepTiming);
         if (tokens.length) {
+          // Word-level: gộp toàn bộ words của line thành 1 token duy nhất
+          // lấy begin của word đầu, end của word cuối
+          if (keepTiming && isWordLevel && tokens.length >= 1) {
+            const lineText = buildLineText(tokens);
+            const lineBegin = tokens[0].begin ?? 0;
+            const lineEnd = tokens[tokens.length - 1].end ?? tokens[tokens.length - 1].begin ?? 0;
+            tokens = [{ text: lineText, begin: lineBegin, end: lineEnd, noSpaceBefore: false }];
+          }
           if (isRight) rvLines.push(tokens);
           else mainLines.push(tokens);
         }
@@ -1674,8 +1698,17 @@ function parseTTMLContent(xmlText, keepTiming) {
         const innerSpans = Array.from(bgSpan.children).filter(el =>
           (el.localName||el.nodeName.split(':').pop()) === 'span'
         );
-        const tokens = innerSpans.length ? spansToText(innerSpans, keepTiming) : [{ text: bgSpan.textContent.trim() }];
-        if (tokens.length && tokens.some(t=>t.text)) bvLines.push(tokens);
+        let tokens = innerSpans.length ? spansToText(innerSpans, keepTiming) : [{ text: bgSpan.textContent.trim() }];
+        if (tokens.length && tokens.some(t=>t.text)) {
+          // Word-level: gộp BV tokens thành 1 line token
+          if (keepTiming && isWordLevel && tokens.length >= 1 && tokens[0].begin !== undefined) {
+            const lineText = buildLineText(tokens);
+            const lineBegin = tokens[0].begin ?? 0;
+            const lineEnd = tokens[tokens.length - 1].end ?? tokens[tokens.length - 1].begin ?? 0;
+            tokens = [{ text: lineText, begin: lineBegin, end: lineEnd, noSpaceBefore: false }];
+          }
+          bvLines.push(tokens);
+        }
       });
     });
 
