@@ -1826,6 +1826,8 @@ function parseTTMLContent(xmlText, keepTiming) {
     if (rvLines.length) window._baseline_rvInput = document.getElementById('rvInput').value;
     if (bvLines.length) window._baseline_bvInput = document.getElementById('bvInput').value;
     refreshAllLoadBtns();
+    updateResetDeleteBtn();
+    updateUndoBtn();
     const total = mainLines.length + rvLines.length + bvLines.length;
     const msg = `✓ ${total} lines imported` + (keepTiming ? ` (with timing)` : ` (text only)`);
     document.getElementById('importStatusMsg').textContent = msg;
