@@ -675,6 +675,70 @@
     line-height: 1;
   }
   .info-icon:hover { color: var(--accent); }
+
+  /* LANGUAGE PICKER */
+  .lang-picker-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .lang-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    padding: 10px 12px;
+    background: transparent;
+    color: var(--text);
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
+  .lang-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .lang-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .lang-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    z-index: 3000;
+    display: none;
+    flex-direction: column;
+    min-width: 130px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+  .lang-dropdown.open { display: flex; }
+  .lang-option {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    padding: 10px 14px;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.1s;
+    white-space: nowrap;
+  }
+  .lang-option:hover { background: rgba(255,255,255,0.06); }
+  .lang-option.selected { color: var(--accent); }
+
   .info-panel {
     display: none;
     position: absolute;
@@ -1084,6 +1148,13 @@
             <span class="other-tool-desc">Sync lyrics at the word level.</span>
           </div>
         </div>
+      </div>
+    </div>
+    <div class="lang-picker-wrapper" id="langPickerWrapper">
+      <button class="lang-btn" id="langBtn" onclick="toggleLangDropdown()" title="Language / Ngôn ngữ">EN</button>
+      <div class="lang-dropdown" id="langDropdown">
+        <button class="lang-option selected" id="opt-en" onclick="setLang('en')">🇬🇧 English</button>
+        <button class="lang-option" id="opt-vi" onclick="setLang('vi')">🇻🇳 Tiếng Việt</button>
       </div>
     </div>
   </div>
@@ -3813,12 +3884,323 @@ function closeThemeDropdown() {
   document.addEventListener('touchend', () => { dragging = false; });
 })();
 
+// ─── LANGUAGE PICKER ──────────────────────────────────────────────────────────
+const TRANSLATIONS = {
+  en: {
+    'logo-sub': 'LINE-LEVEL TIMING TOOL',
+    'undo-btn': '↩ UNDO',
+    'reset-btn': '⟳ RESET',
+    'export-btn': 'EXPORT TTML',
+    's01-label': '01 — Audio File',
+    'upload-p': 'Drop audio file here<br>or click to browse',
+    's02-label': '02 — Import TTML',
+    'ttml-p': 'Drop .ttml file here<br>or click to browse',
+    'playback-handle': '⠿ 03 — Playback',
+    's03-playback-label': '03 — Playback',
+    'hold-space-hint': 'HOLD SPACE / ↓ to sync line',
+    's04-label': '04 — Lyrics',
+    'lyrics-placeholder': 'Paste lyrics here...',
+    'load-lyrics-btn': 'LOAD LYRICS',
+    's05-label': '05 — Additional Lyrics',
+    'rv-placeholder': 'Paste right-side lyrics here...',
+    'load-rv-btn': 'LOAD ADDITIONAL LYRICS',
+    's06-label': '06 — Backing Vocal',
+    'bv-placeholder': 'Paste backing vocal lyrics here...',
+    'load-bv-btn': 'LOAD BACKING VOCAL',
+    'credits-label': 'Credits',
+    'tab-lyric': '04 — LYRIC SYNC',
+    'tab-rv': '05 — ADDITIONAL LYRICS',
+    'tab-bv': '06 — BACKING VOCAL',
+    'empty-h3': 'Ready to Sync',
+    'empty-p': "Load audio and lyrics, then hold SPACE / ↓ while the music plays to stamp each line's timing.",
+    'rv-empty-h3': 'ADDITIONAL LYRICS',
+    'rv-empty-p': 'Load right-side lyrics in section 04, then sync here.',
+    'bv-empty-h3': 'Backing Vocal',
+    'bv-empty-p': 'Load backing vocal lyrics in section 06, then sync here.',
+    'key-hold-space-line': 'Sync line (begin→end)',
+    'key-hold-space-word': 'Sync word (begin→end)',
+    'key-z': 'Undo last stamp',
+    'key-p': 'Play / Pause',
+    'key-arrows': 'Seek ±2s',
+    'key-dblclick-line': 'Edit word text directly.',
+    'key-dblclick-word': 'Correct the word directly.',
+    'key-click-done-line': 'Re-sync from this line',
+    'key-click-done-word': 'Re-sync from here',
+    'info-tab-how': 'How to use',
+    'info-tab-other': 'Other Tools',
+    'info-desc': 'Use <a href="https://genius.com/toxi" target="_blank" style="color:var(--accent);text-decoration:underline;">Toxi</a>\'s <a href="https://toxiplays.github.io/ttmlrenderer/" target="_blank" style="color:var(--accent);text-decoration:underline;">TTML Renderer</a> to view your TTML files.',
+    'info-ellipsis': 'Entering <b>...</b> (ellipsis) in the lyrics will represent a section without lyrics. When exported, the ellipsis will be split into three separate dots spaced evenly apart.',
+    'other-tool-name': 'Word Level Timing Tool',
+    'other-tool-desc': 'Sync lyrics at the word level.',
+    'opt-dark': 'Default',
+    'opt-ellinya': 'Ellinya',
+    'modal-export-title': 'TTML Export',
+    'modal-close': '✕ CLOSE',
+    'modal-copy': '📋 COPY',
+    'modal-download': '⬇ DOWNLOAD .ttml',
+    'import-modal-title': 'Import TTML',
+    'import-modal-p1': 'Do you want to <b style="color:var(--s06-color);">keep the timing</b> from the TTML file?',
+    'import-modal-p2': '— <b>Yes</b>: Lyrics will be included with full timing (already synced).<br>— <b>No</b>: Keep only plain text, without timing.',
+    'import-yes': '✓ Yes',
+    'import-no': '✕ No',
+    'sync-pad-label': 'Sync Pad',
+  },
+  vi: {
+    'logo-sub': 'CÔNG CỤ ĐỊNH THỜI THEO DÒNG',
+    'undo-btn': '↩ HOÀN TÁC',
+    'reset-btn': '⟳ ĐẶT LẠI',
+    'export-btn': 'XUẤT TTML',
+    's01-label': '01 — Tệp Âm Thanh',
+    'upload-p': 'Thả tệp âm thanh vào đây<br>hoặc nhấp để duyệt',
+    's02-label': '02 — Nhập TTML',
+    'ttml-p': 'Thả tệp .ttml vào đây<br>hoặc nhấp để duyệt',
+    'playback-handle': '⠿ 03 — Phát Nhạc',
+    's03-playback-label': '03 — Phát Nhạc',
+    'hold-space-hint': 'GIỮ SPACE / ↓ để đồng bộ dòng',
+    's04-label': '04 — Lời Bài Hát',
+    'lyrics-placeholder': 'Dán lời bài hát vào đây...',
+    'load-lyrics-btn': 'TẢI LỜI BÀI HÁT',
+    's05-label': '05 — Lời Phụ',
+    'rv-placeholder': 'Dán lời phụ vào đây...',
+    'load-rv-btn': 'TẢI LỜI PHỤ',
+    's06-label': '06 — Giọng Nền',
+    'bv-placeholder': 'Dán lời giọng nền vào đây...',
+    'load-bv-btn': 'TẢI GIỌNG NỀN',
+    'credits-label': 'Thông Tin',
+    'tab-lyric': '04 — ĐỒNG BỘ LỜI',
+    'tab-rv': '05 — LỜI PHỤ',
+    'tab-bv': '06 — GIỌNG NỀN',
+    'empty-h3': 'Sẵn Sàng Đồng Bộ',
+    'empty-p': 'Tải âm thanh và lời bài hát, sau đó giữ SPACE / ↓ trong khi nhạc phát để đánh dấu thời điểm từng dòng.',
+    'rv-empty-h3': 'LỜI PHỤ',
+    'rv-empty-p': 'Tải lời phụ ở mục 04, sau đó đồng bộ tại đây.',
+    'bv-empty-h3': 'Giọng Nền',
+    'bv-empty-p': 'Tải lời giọng nền ở mục 06, sau đó đồng bộ tại đây.',
+    'key-hold-space-line': 'Đồng bộ dòng (bắt đầu→kết thúc)',
+    'key-hold-space-word': 'Đồng bộ từ (bắt đầu→kết thúc)',
+    'key-z': 'Hoàn tác lần đánh dấu cuối',
+    'key-p': 'Phát / Dừng',
+    'key-arrows': 'Tua ±2 giây',
+    'key-dblclick-line': 'Chỉnh sửa văn bản trực tiếp.',
+    'key-dblclick-word': 'Chỉnh sửa từ trực tiếp.',
+    'key-click-done-line': 'Đồng bộ lại từ dòng này',
+    'key-click-done-word': 'Đồng bộ lại từ đây',
+    'info-tab-how': 'Hướng Dẫn',
+    'info-tab-other': 'Công Cụ Khác',
+    'info-desc': 'Dùng <a href="https://genius.com/toxi" target="_blank" style="color:var(--accent);text-decoration:underline;">Toxi</a>\'s <a href="https://toxiplays.github.io/ttmlrenderer/" target="_blank" style="color:var(--accent);text-decoration:underline;">TTML Renderer</a> để xem tệp TTML của bạn.',
+    'info-ellipsis': 'Nhập <b>...</b> (dấu chấm lửng) trong lời bài hát sẽ đại diện cho đoạn không có lời. Khi xuất, dấu chấm lửng sẽ được tách thành ba dấu chấm riêng biệt cách đều nhau.',
+    'other-tool-name': 'Công Cụ Định Thời Theo Từ',
+    'other-tool-desc': 'Đồng bộ lời bài hát theo từng từ.',
+    'opt-dark': 'Mặc Định',
+    'opt-ellinya': 'Ellinya',
+    'modal-export-title': 'Xuất TTML',
+    'modal-close': '✕ ĐÓNG',
+    'modal-copy': '📋 SAO CHÉP',
+    'modal-download': '⬇ TẢI XUỐNG .ttml',
+    'import-modal-title': 'Nhập TTML',
+    'import-modal-p1': 'Bạn có muốn <b style="color:var(--s06-color);">giữ lại thời gian</b> từ tệp TTML không?',
+    'import-modal-p2': '— <b>Có</b>: Lời sẽ được đưa vào kèm thời gian đầy đủ (đã đồng bộ).<br>— <b>Không</b>: Chỉ giữ văn bản thuần, không có thời gian.',
+    'import-yes': '✓ Có',
+    'import-no': '✕ Không',
+    'sync-pad-label': 'Bàn Đồng Bộ',
+  }
+};
+
+let currentLang = 'en';
+
+function applyTranslations(lang) {
+  const t = TRANSLATIONS[lang];
+  // Logo
+  const logoEl = document.querySelector('.logo');
+  if (logoEl) {
+    logoEl.childNodes[0].textContent = 'LYRIC SYNC';
+    const logoSpan = logoEl.querySelector('span');
+    if (logoSpan) logoSpan.textContent = t['logo-sub'];
+  }
+  // Header buttons
+  const undoBtn = document.getElementById('undoBtn');
+  if (undoBtn) undoBtn.innerHTML = t['undo-btn'];
+  const resetBtn = document.getElementById('resetBtn');
+  if (resetBtn) resetBtn.innerHTML = t['reset-btn'];
+  const exportBtn = document.getElementById('exportBtn');
+  if (exportBtn) exportBtn.textContent = t['export-btn'];
+  // Theme options
+  const optDark = document.getElementById('opt-dark');
+  if (optDark) optDark.innerHTML = '<span class="theme-dot" style="background:#e0e0e0;border:1px solid #555;"></span> ' + t['opt-dark'];
+  const optEllinya = document.getElementById('opt-ellinya');
+  if (optEllinya) optEllinya.innerHTML = '<span class="theme-dot" style="background:#ff6eb4;"></span> ' + t['opt-ellinya'];
+  // Section labels
+  document.querySelectorAll('.section-label').forEach(el => {
+    const txt = el.textContent.trim();
+    if (txt.startsWith('01')) el.textContent = t['s01-label'];
+    else if (txt.startsWith('02')) el.textContent = t['s02-label'];
+    else if (txt.startsWith('03')) el.textContent = t['s03-playback-label'];
+    else if (txt.startsWith('04')) el.textContent = t['s04-label'];
+    else if (txt.startsWith('05')) el.textContent = t['s05-label'];
+    else if (txt.startsWith('06')) el.textContent = t['s06-label'];
+    else if (el.style.color === 'rgb(255, 110, 180)' || el.style.color.includes('255, 110, 180')) el.textContent = t['credits-label'];
+  });
+  // Upload zones
+  const uploadZone = document.querySelector('#uploadZone p');
+  if (uploadZone) uploadZone.innerHTML = t['upload-p'];
+  const ttmlZone = document.querySelector('#ttmlImportZone p');
+  if (ttmlZone) ttmlZone.innerHTML = t['ttml-p'];
+  // Playback drag handle
+  const handle = document.getElementById('playbackDragHandle');
+  if (handle) handle.textContent = t['playback-handle'];
+  // Hold space hint
+  document.querySelectorAll('.desktop-only').forEach(el => {
+    if (el.tagName === 'SPAN' && el.style.fontFamily && el.textContent.includes('sync')) {
+      el.textContent = t['hold-space-hint'];
+    }
+  });
+  // Textareas placeholder
+  const lyricsInput = document.getElementById('lyricsInput');
+  if (lyricsInput) lyricsInput.placeholder = t['lyrics-placeholder'];
+  const rvInput = document.getElementById('rvInput');
+  if (rvInput) rvInput.placeholder = t['rv-placeholder'];
+  const bvInput = document.getElementById('bvInput');
+  if (bvInput) bvInput.placeholder = t['bv-placeholder'];
+  // Load buttons
+  const loadLyricsBtn = document.getElementById('loadLyricsBtn');
+  if (loadLyricsBtn) loadLyricsBtn.textContent = t['load-lyrics-btn'];
+  const loadRVBtn = document.getElementById('loadRVBtn');
+  if (loadRVBtn) loadRVBtn.textContent = t['load-rv-btn'];
+  const loadBVBtn = document.getElementById('loadBVBtn');
+  if (loadBVBtn) loadBVBtn.textContent = t['load-bv-btn'];
+  // Tabs
+  const tabLyric = document.getElementById('tab-lyric');
+  if (tabLyric) tabLyric.textContent = t['tab-lyric'];
+  const tabRv = document.getElementById('tab-rv');
+  if (tabRv) tabRv.textContent = t['tab-rv'];
+  const tabBv = document.getElementById('tab-bv');
+  if (tabBv) tabBv.textContent = t['tab-bv'];
+  // Empty states
+  const emptyStates = document.querySelectorAll('.empty-state');
+  if (emptyStates[0]) {
+    const h3 = emptyStates[0].querySelector('h3');
+    const p = emptyStates[0].querySelector('p');
+    if (h3) h3.textContent = t['empty-h3'];
+    if (p) p.textContent = t['empty-p'];
+  }
+  if (emptyStates[1]) {
+    const h3 = emptyStates[1].querySelector('h3');
+    const p = emptyStates[1].querySelector('p');
+    if (h3) h3.textContent = t['rv-empty-h3'];
+    if (p) p.textContent = t['rv-empty-p'];
+  }
+  if (emptyStates[2]) {
+    const h3 = emptyStates[2].querySelector('h3');
+    const p = emptyStates[2].querySelector('p');
+    if (h3) h3.textContent = t['bv-empty-h3'];
+    if (p) p.textContent = t['bv-empty-p'];
+  }
+  // Instruction bars
+  document.querySelectorAll('.instruction-bar').forEach(bar => {
+    bar.querySelectorAll('.key-hint').forEach(hint => {
+      const keyEl = hint.querySelector('.key');
+      const span = hint.querySelector('span:not(.key)');
+      if (!keyEl || !span) return;
+      const keyTxt = keyEl.textContent.trim();
+      if (keyTxt === 'HOLD SPACE / ↓') {
+        const isLinePanel = bar.closest('#panel-lyric') !== null;
+        span.textContent = isLinePanel ? t['key-hold-space-line'] : t['key-hold-space-word'];
+      }
+      else if (keyTxt === 'Z / ↑') span.textContent = t['key-z'];
+      else if (keyTxt === 'P') span.textContent = t['key-p'];
+      else if (keyTxt === '← →') span.textContent = t['key-arrows'];
+      else if (keyTxt === 'DBLCLICK') {
+        const isLinePanel = bar.closest('#panel-lyric') !== null;
+        span.textContent = isLinePanel ? t['key-dblclick-line'] : t['key-dblclick-word'];
+      }
+      else if (keyTxt === 'CLICK (done line)') span.textContent = t['key-click-done-line'];
+      else if (keyTxt === 'CLICK (done)') span.textContent = t['key-click-done-word'];
+    });
+  });
+  // Mobile shared instruction bar
+  const sharedBar = document.getElementById('sharedInstructionBar');
+  if (sharedBar) {
+    sharedBar.querySelectorAll('.key-hint').forEach(hint => {
+      const keyEl = hint.querySelector('.key');
+      const span = hint.querySelector('span:not(.key)');
+      if (!keyEl || !span) return;
+      const keyTxt = keyEl.textContent.trim();
+      if (keyTxt === 'HOLD SPACE / ↓') span.textContent = t['key-hold-space-word'];
+      else if (keyTxt === 'Z / ↑') span.textContent = t['key-z'];
+      else if (keyTxt === 'P') span.textContent = t['key-p'];
+      else if (keyTxt === '← →') span.textContent = t['key-arrows'];
+      else if (keyTxt === 'DBLCLICK') span.textContent = t['key-dblclick-word'];
+      else if (keyTxt === 'CLICK (done)') span.textContent = t['key-click-done-word'];
+    });
+  }
+  // Info panel tabs
+  document.querySelectorAll('.info-panel-tab').forEach(tab => {
+    if (tab.dataset.tab === 'how-to-use') tab.textContent = t['info-tab-how'];
+    if (tab.dataset.tab === 'other-tools') tab.textContent = t['info-tab-other'];
+  });
+  // Info panel content
+  const infoDescEl = document.querySelector('[data-tab="how-to-use"] .info-panel-item:first-child span');
+  if (infoDescEl) infoDescEl.innerHTML = t['info-desc'];
+  const infoItems = document.querySelectorAll('[data-tab="how-to-use"] .info-panel-item');
+  if (infoItems[1]) {
+    const span = infoItems[1].querySelector('span:not(.info-panel-key)');
+    if (span) span.innerHTML = t['info-ellipsis'];
+  }
+  // Other tools
+  const otherToolName = document.querySelector('.other-tool-name');
+  if (otherToolName) otherToolName.textContent = t['other-tool-name'];
+  const otherToolDesc = document.querySelector('.other-tool-desc');
+  if (otherToolDesc) otherToolDesc.textContent = t['other-tool-desc'];
+  // Export modal
+  const modalTitle = document.querySelector('#modalOverlay .modal-header h2');
+  if (modalTitle) modalTitle.textContent = t['modal-export-title'];
+  const modalClose = document.querySelector('#modalOverlay .modal-header .btn');
+  if (modalClose) modalClose.textContent = t['modal-close'];
+  const modalCopy = document.querySelector('#modalOverlay .modal-footer .btn:first-child');
+  if (modalCopy) modalCopy.textContent = t['modal-copy'];
+  const modalDownload = document.querySelector('#modalOverlay .modal-footer .btn.primary');
+  if (modalDownload) modalDownload.textContent = t['modal-download'];
+  // Import modal
+  const importTitle = document.querySelector('#ttmlImportModal .modal-header h2');
+  if (importTitle) importTitle.textContent = t['import-modal-title'];
+  const importPs = document.querySelectorAll('#ttmlImportModal .modal-body p');
+  if (importPs[0]) importPs[0].innerHTML = t['import-modal-p1'];
+  if (importPs[1]) importPs[1].innerHTML = t['import-modal-p2'];
+  const importYes = document.querySelector('#ttmlImportModal .btn.primary');
+  if (importYes) importYes.textContent = t['import-yes'];
+  const importNo = document.querySelector('#ttmlImportModal .btn.danger');
+  if (importNo) importNo.textContent = t['import-no'];
+  // Sync pad label
+  const padLabel = document.querySelector('#syncButtonPad .pad-label');
+  if (padLabel) padLabel.textContent = t['sync-pad-label'];
+}
+
+function setLang(lang) {
+  currentLang = lang;
+  applyTranslations(lang);
+  document.getElementById('langBtn').textContent = lang === 'vi' ? 'VI' : 'EN';
+  document.getElementById('opt-en').classList.toggle('selected', lang === 'en');
+  document.getElementById('opt-vi').classList.toggle('selected', lang === 'vi');
+  closeLangDropdown();
+}
+
+function toggleLangDropdown() {
+  document.getElementById('langDropdown').classList.toggle('open');
+}
+
+function closeLangDropdown() {
+  document.getElementById('langDropdown').classList.remove('open');
+}
+
 document.addEventListener('click', (e) => {
   if (!document.getElementById('themePickerWrapper').contains(e.target)) {
     closeThemeDropdown();
   }
   if (!document.getElementById('infoWrapper').contains(e.target)) {
     hideInfoPanel();
+  }
+  if (!document.getElementById('langPickerWrapper').contains(e.target)) {
+    closeLangDropdown();
   }
   const importModal = document.getElementById('ttmlImportModal');
   if (importModal.classList.contains('visible') && e.target === importModal) {
