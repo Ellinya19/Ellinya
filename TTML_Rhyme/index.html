@@ -830,6 +830,43 @@ let currentLang = 'en';
 let parsedWords = [];
 let audioDuration = 0;
 let wordColor = '#ffffff';
+
+const WORD_BOX = 110;
+const WORD_SAFE_PAD = 14;
+const LINE_STEP_MIN = 118;
+const LINE_STEP_MAX = 154;
+const LINE_GAP_MIN = 12;
+const LINE_GAP_MAX = 22;
+const LINE_TURN_MIN = 0.06;
+const LINE_TURN_MAX = 0.14;
+
+let linePlacementState = new Map();
+
+function getWordHalfPadding() {
+  return WORD_BOX / 2 + WORD_SAFE_PAD;
+}
+
+function getLineState(lineId) {
+  const key = lineId ?? '__default__';
+  if (!linePlacementState.has(key)) {
+    linePlacementState.set(key, {
+      angle: null,
+      curve: Math.random() < 0.5 ? 1 : -1,
+      step: LINE_STEP_MIN + Math.random() * (LINE_STEP_MAX - LINE_STEP_MIN),
+    });
+  }
+  return linePlacementState.get(key);
+}
+
+function getWordAnchorPx(word, cw, ch) {
+  if (word._groupEndX !== undefined && word._groupEndY !== undefined) {
+    return { x: word._groupEndX, y: word._groupEndY };
+  }
+  if (word._px !== undefined && word._py !== undefined) {
+    return { x: (word._px / 100) * cw, y: (word._py / 100) * ch };
+  }
+  return { x: cw / 2, y: ch / 2 };
+}
   let lastHitIdx = -1;          // Index of last successfully hit word (enforce sequential)
   let isPaused = false;
   let pausedAt = 0;             // AudioContext time when paused

@@ -164,7 +164,9 @@ const Game = (() => {
           continue;
         }
       }
+      const lineId = Array.from(doc.getElementsByTagNameNS(ns, 'p').length ? doc.getElementsByTagNameNS(ns, 'p') : doc.querySelectorAll('p')).indexOf(w.pEl);
       const { pEl: _p, ...rest } = w;
+      rest.lineId = lineId >= 0 ? lineId : merged.length;
       merged.push(rest);
     }
 
@@ -233,6 +235,18 @@ const Game = (() => {
     if (!audioBuffer || !audioContext) return;
     wordColor = color || '#ffffff';
     words = ttmlWords;
+    words.forEach(w => {
+      w._scheduled = false;
+      w._px = undefined;
+      w._py = undefined;
+      w._swipePreTx = undefined;
+      w._swipePreTy = undefined;
+      w._swipeUseArc = undefined;
+      w._swipeSweepDir = undefined;
+      w._ghostClicked = false;
+      w._ghostLineSvg = null;
+      w._ghostDotEl = null;
+    });
     score = 0;
     missCount = 0;
     combo = 0;
@@ -345,6 +359,78 @@ const Game = (() => {
   }
 
   // ── Ghost Word ────────────────────────────────────────────
+  // ── Arc trail helper ─────────────────────────────────────
+  // Returns SVG path "d" for a half-arc between (x1,y1) and (x2,y2)
+  // sweepDir: 1 = clockwise arc, -1 = counter-clockwise
+  // ── Arc geometry (shared by draw + drag) ─────────────────
+  // SVG "A rx ry 0 large-arc-flag sweep-flag x2 y2"
+  // sweepDir=1 → sweep-flag=1 (clockwise in SVG coords)
+  // The center of that arc lies on the SAME side determined here.
+  function getArcGeometry(ox, oy, tx, ty, sweepDir) {
+    const dx = tx - ox, dy = ty - oy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const r = dist * 0.75;
+    const mx = (ox + tx) / 2, my = (oy + ty) / 2;
+    // Perpendicular unit vector (rotated 90° CCW from ox→tx)
+    const pdx = -dy / dist, pdy = dx / dist;
+    const h = Math.sqrt(Math.max(0, r * r - (dist / 2) * (dist / 2)));
+    // SVG sweep-flag=1 means clockwise → center is to the LEFT of the chord
+    // (SVG Y-axis points down, so "left of OX→TX" = sign = +1 on pdx)
+    // sweep-flag=0 (CCW) → center to the RIGHT → sign = -1
+    const sign = sweepDir === 1 ? 1 : -1;
+    const cx = mx + sign * h * pdx;
+    const cy = my + sign * h * pdy;
+    const startA = Math.atan2(oy - cy, ox - cx);
+    let sweep = Math.atan2(ty - cy, tx - cx) - startA;
+    if (sweepDir === 1) { if (sweep < 0) sweep += 2 * Math.PI; }
+    else               { if (sweep > 0) sweep -= 2 * Math.PI; }
+    return { cx, cy, r, startA, sweep };
+  }
+
+  function arcPathD(x1, y1, x2, y2, sweepDir) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const r = dist * 0.75;
+    return `M ${x1} ${y1} A ${r} ${r} 0 0 ${sweepDir === 1 ? 1 : 0} ${x2} ${y2}`;
+  }
+
+  // ── Arc drag projection ───────────────────────────────────
+  // Samples 128 points on the SAME arc as arcPathD, returns nearest {x, y, t}
+  function projectOntoArc(mouseX, mouseY, ox, oy, tx, ty, sweepDir) {
+    const { cx, cy, r, startA, sweep } = getArcGeometry(ox, oy, tx, ty, sweepDir);
+    const N = 128;
+    let best = null, bestD2 = Infinity;
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      const angle = startA + sweep * t;
+      const px = cx + r * Math.cos(angle);
+      const py = cy + r * Math.sin(angle);
+      const d2 = (mouseX - px) ** 2 + (mouseY - py) ** 2;
+      if (d2 < bestD2) { bestD2 = d2; best = { x: px, y: py, t }; }
+    }
+    return best;
+  }
+
+  // ── Position resolver ─────────────────────────────────────
+  // Pure random placement with anti-overlap check.
+  function resolveWordPosition(word, idx, container) {
+    const now2 = getCurrentTime();
+    usedPositions = usedPositions.filter(p => p.expire > now2);
+
+    let px, py, tries = 0;
+    do {
+      px = 8 + Math.random() * 84;
+      py = 10 + Math.random() * 80;
+      tries++;
+    } while (
+      tries < 30 &&
+      usedPositions.some(p => Math.abs(p.px - px) < 18 && Math.abs(p.py - py) < 18)
+    );
+
+    usedPositions.push({ px, py, expire: now2 + GHOST_LEAD + WORD_LINGER + 0.5 });
+    return { px, py };
+  }
+
   function spawnGhostWord(word, idx) {
     const container = document.getElementById('game-field');
     if (!container) return;
@@ -355,19 +441,8 @@ const Game = (() => {
     el.id = id;
     el.textContent = word.text;
 
-    // Position avoiding overlap with active words
-    const now2 = getCurrentTime();
-    usedPositions = usedPositions.filter(p => p.expire > now2);
-    let px, py, tries = 0;
-    do {
-      px = 8 + Math.random() * 84;
-      py = 10 + Math.random() * 80;
-      tries++;
-    } while (
-      tries < 30 &&
-      usedPositions.some(p => Math.abs(p.px - px) < 18 && Math.abs(p.py - py) < 18)
-    );
-    usedPositions.push({ px, py, expire: now2 + GHOST_LEAD + WORD_LINGER + 0.5 });
+    // Position: line-group aware
+    const { px, py } = resolveWordPosition(word, idx, container);
     el.style.left = `${px}%`;
     el.style.top = `${py}%`;
     el.style.color = wordColor;
@@ -389,7 +464,7 @@ const Game = (() => {
     container.appendChild(el);
     activeWords.set(id, { el, word, isGhost: true });
 
-    // If swipe word: pre-calculate target and draw ghost line
+    // If swipe word: pre-calculate target and draw ghost trail (line or arc)
     if (word._isSwipe) {
       const cw = container.offsetWidth  || window.innerWidth;
       const ch = container.offsetHeight || window.innerHeight;
@@ -413,6 +488,10 @@ const Game = (() => {
       tx = Math.max(MARGIN, Math.min(cw - MARGIN, tx));
       ty = Math.max(MARGIN, Math.min(ch - MARGIN, ty));
 
+      // Randomly decide straight or arc (50/50)
+      const useArc = Math.random() < 0.5;
+      const sweepDir = Math.random() < 0.5 ? 1 : -1;
+
       // Store for setupSwipeWord to reuse
       word._swipePreTx = tx;
       word._swipePreTy = ty;
@@ -420,8 +499,10 @@ const Game = (() => {
       word._swipePreOy = oy;
       word._swipePreCw = cw;
       word._swipePreCh = ch;
+      word._swipeUseArc = useArc;
+      word._swipeSweepDir = sweepDir;
 
-      // Ghost line SVG — fades in over GHOST_LEAD duration
+      // Ghost trail SVG
       const gSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       gSvg.classList.add('ghost-swipe-trail');
       gSvg.style.left = '0';
@@ -429,20 +510,32 @@ const Game = (() => {
       gSvg.style.width = `${cw}px`;
       gSvg.style.height = `${ch}px`;
       gSvg.style.setProperty('--ghost-line-duration', `${GHOST_LEAD}s`);
-      const gLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      gLine.setAttribute('x1', ox);
-      gLine.setAttribute('y1', oy);
-      gLine.setAttribute('x2', tx);
-      gLine.setAttribute('y2', ty);
-      gLine.setAttribute('stroke', wordColor);
-      gLine.setAttribute('stroke-width', '3');
-      gLine.setAttribute('stroke-dasharray', '8 6');
-      gLine.setAttribute('opacity', '0.3');
-      gSvg.appendChild(gLine);
+
+      if (useArc) {
+        const gPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        gPath.setAttribute('d', arcPathD(ox, oy, tx, ty, sweepDir));
+        gPath.setAttribute('stroke', wordColor);
+        gPath.setAttribute('stroke-width', '3');
+        gPath.setAttribute('stroke-dasharray', '8 6');
+        gPath.setAttribute('opacity', '0.3');
+        gPath.setAttribute('fill', 'none');
+        gSvg.appendChild(gPath);
+      } else {
+        const gLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        gLine.setAttribute('x1', ox);
+        gLine.setAttribute('y1', oy);
+        gLine.setAttribute('x2', tx);
+        gLine.setAttribute('y2', ty);
+        gLine.setAttribute('stroke', wordColor);
+        gLine.setAttribute('stroke-width', '3');
+        gLine.setAttribute('stroke-dasharray', '8 6');
+        gLine.setAttribute('opacity', '0.3');
+        gSvg.appendChild(gLine);
+      }
       container.appendChild(gSvg);
       word._ghostLineSvg = gSvg;
 
-      // Ghost target dot — also fades in
+      // Ghost target dot
       const gDot = document.createElement('div');
       gDot.className = 'swipe-target-dot';
       gDot.style.left = `${tx}px`;
@@ -603,23 +696,34 @@ const Game = (() => {
       ty = Math.max(MARGIN, Math.min(ch - MARGIN, ty));
     }
 
-    // Draw dashed trail SVG
+    // Draw dashed trail SVG (line or arc)
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.classList.add('swipe-trail');
     svg.style.left = '0';
     svg.style.top = '0';
     svg.style.width = `${cw}px`;
     svg.style.height = `${ch}px`;
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', ox);
-    line.setAttribute('y1', oy);
-    line.setAttribute('x2', tx);
-    line.setAttribute('y2', ty);
-    line.setAttribute('stroke', wordColor);
-    line.setAttribute('stroke-width', '3');
-    line.setAttribute('stroke-dasharray', '8 6');
-    line.setAttribute('opacity', '0.45');
-    svg.appendChild(line);
+    if (word._swipeUseArc) {
+      const arcPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      arcPath.setAttribute('d', arcPathD(ox, oy, tx, ty, word._swipeSweepDir ?? 1));
+      arcPath.setAttribute('stroke', wordColor);
+      arcPath.setAttribute('stroke-width', '3');
+      arcPath.setAttribute('stroke-dasharray', '8 6');
+      arcPath.setAttribute('opacity', '0.45');
+      arcPath.setAttribute('fill', 'none');
+      svg.appendChild(arcPath);
+    } else {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', ox);
+      line.setAttribute('y1', oy);
+      line.setAttribute('x2', tx);
+      line.setAttribute('y2', ty);
+      line.setAttribute('stroke', wordColor);
+      line.setAttribute('stroke-width', '3');
+      line.setAttribute('stroke-dasharray', '8 6');
+      line.setAttribute('opacity', '0.45');
+      svg.appendChild(line);
+    }
     container.appendChild(svg);
 
     // Target dot
@@ -658,33 +762,58 @@ const Game = (() => {
       startY = y - rect.top;
     }
 
+    let currentArcT = 0; // track arc progress, only allow forward movement
+
     function onDragMove(e) {
       if (!dragging || el._swipeDone) return;
       e.preventDefault();
       const { x, y } = getEventXY(e);
       const rect = container.getBoundingClientRect();
-      let cx2 = x - rect.left;
-      let cy2 = y - rect.top;
+      const cx2 = x - rect.left;
+      const cy2 = y - rect.top;
 
-      // Project onto the allowed line (ox→tx, oy→ty)
-      const dx = tx - ox, dy = ty - oy;
-      const len = Math.sqrt(dx * dx + dy * dy);
-      const ux = dx / len, uy = dy / len;
-      const dot2 = (cx2 - ox) * ux + (cy2 - oy) * uy;
-      const clamped = Math.max(0, Math.min(len, dot2));
+      if (word._swipeUseArc) {
+        const sweepDir = word._swipeSweepDir ?? 1;
+        const { cx: cxArc, cy: cyArc, r, startA, sweep } = getArcGeometry(ox, oy, tx, ty, sweepDir);
 
-      const nx = ox + ux * clamped;
-      const ny = oy + uy * clamped;
+        // Project mouse onto arc; only allow forward movement
+        const proj = projectOntoArc(cx2, cy2, ox, oy, tx, ty, sweepDir);
 
-      el.style.left = `${(nx / cw) * 100}%`;
-      el.style.top  = `${(ny / ch) * 100}%`;
+        // Lock: if mouse is too far from the arc (>80px), don't advance
+        const distToArc = Math.sqrt((cx2 - proj.x) ** 2 + (cy2 - proj.y) ** 2);
+        if (distToArc > 80) return; // word stays at currentArcT position
 
-      // Check if reached target (within 28px)
-      if (clamped >= len - 28) {
-        el._swipeDone = true;
-        dragging = false;
-        cleanupSwipeListeners();
-        handleSwipeComplete(el, word, id, container);
+        const clampedT = Math.max(currentArcT, proj.t);
+        currentArcT = clampedT;
+
+        // Re-sample clamped point using SAME geometry
+        const angle = startA + sweep * clampedT;
+        const clampedX = cxArc + r * Math.cos(angle);
+        const clampedY = cyArc + r * Math.sin(angle);
+
+        el.style.left = `${(clampedX / cw) * 100}%`;
+        el.style.top  = `${(clampedY / ch) * 100}%`;
+        if (clampedT >= 0.93) {
+          el._swipeDone = true;
+          dragging = false;
+          cleanupSwipeListeners();
+          handleSwipeComplete(el, word, id, container);
+        }
+      } else {
+        // Project onto straight line (ox→tx, oy→ty)
+        const dx = tx - ox, dy = ty - oy;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const ux = dx / len, uy = dy / len;
+        const dot2 = (cx2 - ox) * ux + (cy2 - oy) * uy;
+        const clamped = Math.max(0, Math.min(len, dot2));
+        el.style.left = `${((ox + ux * clamped) / cw) * 100}%`;
+        el.style.top  = `${((oy + uy * clamped) / ch) * 100}%`;
+        if (clamped >= len - 28) {
+          el._swipeDone = true;
+          dragging = false;
+          cleanupSwipeListeners();
+          handleSwipeComplete(el, word, id, container);
+        }
       }
     }
 
