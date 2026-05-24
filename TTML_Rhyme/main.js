@@ -136,8 +136,8 @@ const Game = (() => {
             // Text node with no space = spans are glued (backslash-join in source)
             if (prev.nodeType === 3 && prev.textContent.trim() === '') noSpaceBefore = true;
           }
-          // Strip trailing hyphen from display (oh- → oh)
-          const text = rawText.replace(/-+$/, '');
+          // Strip trailing hyphen, then remove special chars except ? and !
+          const text = rawText.replace(/-+$/, '').replace(/[^\p{L}\p{N}\s?!]/gu, '').trim();
           if (text.length > 0) {
             rawWords.push({ text, begin, end, type, noSpaceBefore, pEl: p });
           }
