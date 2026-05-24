@@ -1147,6 +1147,10 @@
             <a class="other-tool-name" href="https://ellinya19.github.io/Ellinya/SyncLyrics_Words/index.html" target="_blank">Word Level Timing Tool</a>
             <span class="other-tool-desc">Sync lyrics at the word level.</span>
           </div>
+          <div class="other-tool-item">
+            <a class="other-tool-name other-tool-name-rhyme" href="https://ellinya19.github.io/Ellinya/TTML_Rhyme/" target="_blank">TTML Rhyme</a>
+            <span class="other-tool-desc other-tool-desc-rhyme">A game tool for TTML files — play along to lyrics like Osu!</span>
+          </div>
         </div>
       </div>
     </div>
@@ -3932,6 +3936,8 @@ const TRANSLATIONS = {
     'info-ellipsis': 'Entering <b>...</b> (ellipsis) in the lyrics will represent a section without lyrics. When exported, the ellipsis will be split into three separate dots spaced evenly apart.',
     'other-tool-name': 'Word Level Timing Tool',
     'other-tool-desc': 'Sync lyrics at the word level.',
+    'other-tool-name-rhyme': 'TTML Rhyme',
+    'other-tool-desc-rhyme': 'A game tool for TTML files — play along to lyrics like Osu!',
     'opt-dark': 'Default',
     'opt-ellinya': 'Ellinya',
     'modal-export-title': 'TTML Export',
@@ -3991,6 +3997,8 @@ const TRANSLATIONS = {
     'info-ellipsis': 'Nhập <b>...</b> (dấu chấm lửng) trong lời bài hát sẽ đại diện cho đoạn không có lời. Khi xuất, dấu chấm lửng sẽ được tách thành ba dấu chấm riêng biệt cách đều nhau.',
     'other-tool-name': 'Công Cụ Định Thời Theo Từ',
     'other-tool-desc': 'Đồng bộ lời bài hát theo từng từ.',
+    'other-tool-name-rhyme': 'TTML Rhyme',
+    'other-tool-desc-rhyme': 'Công cụ chơi game với file TTML — chơi theo lời bài hát như Osu!',
     'opt-dark': 'Mặc Định',
     'opt-ellinya': 'Ellinya',
     'modal-export-title': 'Xuất TTML',
@@ -4151,6 +4159,10 @@ function applyTranslations(lang) {
   if (otherToolName) otherToolName.textContent = t['other-tool-name'];
   const otherToolDesc = document.querySelector('.other-tool-desc');
   if (otherToolDesc) otherToolDesc.textContent = t['other-tool-desc'];
+  const otherToolNameRhyme = document.querySelector('.other-tool-name-rhyme');
+  if (otherToolNameRhyme) otherToolNameRhyme.textContent = t['other-tool-name-rhyme'];
+  const otherToolDescRhyme = document.querySelector('.other-tool-desc-rhyme');
+  if (otherToolDescRhyme) otherToolDescRhyme.textContent = t['other-tool-desc-rhyme'];
   // Export modal
   const modalTitle = document.querySelector('#modalOverlay .modal-header h2');
   if (modalTitle) modalTitle.textContent = t['modal-export-title'];

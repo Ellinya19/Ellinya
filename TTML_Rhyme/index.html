@@ -1107,8 +1107,10 @@ document.addEventListener('click', (e) => {
   });
 });
 
-// ── Disable right-click in game field ─────────────────────
+// ── Disable right-click & text selection in game field ────
 document.getElementById('game-field').addEventListener('contextmenu', e => e.preventDefault());
+document.getElementById('game-field').addEventListener('selectstart', e => e.preventDefault());
+document.getElementById('game-field').addEventListener('mousedown', e => { if (e.detail > 1) e.preventDefault(); });
 
 // ── Init ──────────────────────────────────────────────────
 applyTranslations();
