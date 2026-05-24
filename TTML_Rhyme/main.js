@@ -15,6 +15,7 @@ const Game = (() => {
 
   let words = [];              // Parsed words: {text, begin, end, type}
   let activeWords = new Map(); // id → DOM element
+  let usedPositions = [];      // [{px, py, expire}] – anti-overlap grid
   let score = 0;
   let missCount = 0;
   let combo = 0;
@@ -25,7 +26,7 @@ const Game = (() => {
   let wordColor = '#ffffff';
 
   // ── Constants ────────────────────────────────────────────
-  const GHOST_LEAD = 1.8;      // Ghost appears N seconds before main word
+  const GHOST_LEAD = 1.6;      // Ghost appears N seconds before main word
   const WORD_LINGER = 3.0;     // Word stays on screen N seconds before auto-miss
   const TIMING_WINDOWS = [
     { label: 'PERFECT', maxDelta: 0.15, color: 'rainbow' },
@@ -228,6 +229,7 @@ const Game = (() => {
     gameRunning = true;
     gameStarted = false;
     activeWords.clear();
+    usedPositions = [];
 
     // Resume AudioContext if suspended
     if (audioContext.state === 'suspended') await audioContext.resume();
@@ -340,9 +342,19 @@ const Game = (() => {
     el.id = id;
     el.textContent = word.text;
 
-    // Random position (avoid edges)
-    const px = 8 + Math.random() * 84;
-    const py = 10 + Math.random() * 80;
+    // Position avoiding overlap with active words
+    const now2 = getCurrentTime();
+    usedPositions = usedPositions.filter(p => p.expire > now2);
+    let px, py, tries = 0;
+    do {
+      px = 8 + Math.random() * 84;
+      py = 10 + Math.random() * 80;
+      tries++;
+    } while (
+      tries < 30 &&
+      usedPositions.some(p => Math.abs(p.px - px) < 18 && Math.abs(p.py - py) < 18)
+    );
+    usedPositions.push({ px, py, expire: now2 + GHOST_LEAD + WORD_LINGER + 0.5 });
     el.style.left = `${px}%`;
     el.style.top = `${py}%`;
     el.style.color = wordColor;

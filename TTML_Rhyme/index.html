@@ -19,16 +19,6 @@
   --active-glow: 0 0 30px rgba(220,220,220,0.3);
   --word-color: #ffffff;
 }
-body.light-mode {
-  --bg: #f2f2f2;
-  --surface: #e8e8e8;
-  --border: #cccccc;
-  --accent: #222222;
-  --accent2: #555555;
-  --text: #111111;
-  --muted: #888888;
-  --active-glow: 0 0 30px rgba(0,0,0,0.15);
-}
 
 *{margin:0;padding:0;box-sizing:border-box;}
 
@@ -531,6 +521,15 @@ header {
   backdrop-filter:blur(4px);
 }
 #end-screen.active{display:flex;}
+.end-box {
+  border:1px solid rgba(255,255,255,0.25);
+  padding:48px 64px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:32px;
+  background:transparent;
+}
 .end-title {
   font-family:'Lexend',sans-serif;
   font-size:clamp(28px,5vw,56px);
@@ -601,9 +600,6 @@ header {
       </label>
       <input type="color" id="wordColorInput" value="#ffffff">
     </div>
-
-    <!-- Dark/Light mode -->
-    <button class="icon-btn" id="themeToggleBtn" title="Toggle theme" onclick="toggleTheme()">☀️</button>
 
     <!-- Language picker -->
     <div class="dropdown-wrapper" id="langWrapper">
@@ -694,24 +690,26 @@ header {
 
   <!-- End screen -->
   <div id="end-screen">
-    <div class="end-title" id="end-title">COMPLETE</div>
-    <div class="end-stats">
-      <div class="end-stat">
-        <span class="end-stat-num" id="end-score">0</span>
-        <span class="end-stat-label" id="end-score-label">SCORE</span>
+    <div class="end-box">
+      <div class="end-title" id="end-title">COMPLETE</div>
+      <div class="end-stats">
+        <div class="end-stat">
+          <span class="end-stat-num" id="end-score">0</span>
+          <span class="end-stat-label" id="end-score-label">SCORE</span>
+        </div>
+        <div class="end-stat">
+          <span class="end-stat-num" id="end-miss">0</span>
+          <span class="end-stat-label" id="end-miss-label">MISSES</span>
+        </div>
+        <div class="end-stat">
+          <span class="end-stat-num" id="end-acc">0%</span>
+          <span class="end-stat-label" id="end-acc-label">ACCURACY</span>
+        </div>
       </div>
-      <div class="end-stat">
-        <span class="end-stat-num" id="end-miss">0</span>
-        <span class="end-stat-label" id="end-miss-label">MISSES</span>
+      <div class="end-actions">
+        <button class="btn primary" onclick="onPlayAgain()" id="btn-play-again">PLAY AGAIN</button>
+        <button class="btn" style="color:#ffffff;border-color:rgba(255,255,255,0.3);" onclick="onBackToMenu()" id="btn-back">BACK TO MENU</button>
       </div>
-      <div class="end-stat">
-        <span class="end-stat-num" id="end-acc">0%</span>
-        <span class="end-stat-label" id="end-acc-label">ACCURACY</span>
-      </div>
-    </div>
-    <div class="end-actions">
-      <button class="btn primary" onclick="onPlayAgain()" id="btn-play-again">PLAY AGAIN</button>
-      <button class="btn" onclick="onBackToMenu()" id="btn-back">BACK TO MENU</button>
     </div>
   </div>
 </div>
@@ -723,7 +721,6 @@ header {
 <script>
 // ── State ──────────────────────────────────────────────────
 let currentLang = 'en';
-let isDark = true;
 let parsedWords = [];
 let audioDuration = 0;
 let wordColor = '#ffffff';
@@ -839,13 +836,6 @@ function toggleLangDropdown() {
 }
 function closeLangDropdown() {
   document.getElementById('langDropdown').classList.remove('open');
-}
-
-// ── Theme ──────────────────────────────────────────────────
-function toggleTheme() {
-  isDark = !isDark;
-  document.body.classList.toggle('light-mode', !isDark);
-  document.getElementById('themeToggleBtn').textContent = isDark ? '☀️' : '🌙';
 }
 
 // ── Info Panel ─────────────────────────────────────────────
@@ -1116,6 +1106,9 @@ document.addEventListener('click', (e) => {
     }
   });
 });
+
+// ── Disable right-click in game field ─────────────────────
+document.getElementById('game-field').addEventListener('contextmenu', e => e.preventDefault());
 
 // ── Init ──────────────────────────────────────────────────
 applyTranslations();
