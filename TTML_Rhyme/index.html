@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TTML RHYME</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&family=Lexend:wght@300;400;500&family=Be+Vietnam+Pro:wght@300;400;500&display=swap');
+
+/* ── CSS Variables ── */
+:root {
+  --bg: #111111;
+  --surface: #1a1a1a;
+  --border: #2e2e2e;
+  --accent: #e0e0e0;
+  --accent2: #999999;
+  --text: #f0f0f0;
+  --muted: #666666;
+  --active-glow: 0 0 30px rgba(220,220,220,0.3);
+  --word-color: #ffffff;
+}
+body.light-mode {
+  --bg: #f2f2f2;
+  --surface: #e8e8e8;
+  --border: #cccccc;
+  --accent: #222222;
+  --accent2: #555555;
+  --text: #111111;
+  --muted: #888888;
+  --active-glow: 0 0 30px rgba(0,0,0,0.15);
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+
+body {
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Be Vietnam Pro',sans-serif;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  overflow-x:hidden;
+  transition: background 0.3s, color 0.3s;
+}
+
+/* Scanline overlay */
+body::before {
+  content:'';
+  position:fixed;
+  inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.05) 2px,rgba(0,0,0,0.05) 4px);
+  pointer-events:none;
+  z-index:1000;
+}
+
+/* ── Header ── */
+header {
+  padding:18px 32px;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  gap:20px;
+  flex-wrap:wrap;
+  position:relative;
+  z-index:10;
+  background:var(--bg);
+  transition:background 0.3s, border-color 0.3s;
+}
+.logo {
+  font-family:'Lexend',sans-serif;
+  font-size:24px;
+  letter-spacing:4px;
+  color:var(--accent);
+}
+.logo span {
+  color:var(--muted);
+  font-size:10px;
+  font-family:'IBM Plex Mono',monospace;
+  letter-spacing:2px;
+  display:block;
+  margin-top:-2px;
+}
+.header-controls {
+  display:flex;
+  gap:10px;
+  margin-left:auto;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+/* ── Buttons ── */
+.btn {
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10px;
+  letter-spacing:1.5px;
+  text-transform:uppercase;
+  padding:8px 16px;
+  border:1px solid var(--border);
+  background:transparent;
+  color:var(--text);
+  cursor:pointer;
+  transition:all 0.15s;
+}
+.btn:hover{border-color:var(--accent);color:var(--accent);}
+.btn.primary{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:700;}
+.btn.primary:hover{opacity:0.85;}
+.btn:disabled{opacity:0.3;cursor:not-allowed;}
+
+/* ── Icon button ── */
+.icon-btn {
+  width:38px;height:38px;
+  border:1px solid var(--border);
+  background:transparent;
+  color:var(--muted);
+  cursor:pointer;
+  font-size:18px;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.15s;
+  flex-shrink:0;
+}
+.icon-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+/* ── Dropdown ── */
+.dropdown-wrapper{position:relative;}
+.dropdown-menu {
+  position:absolute;
+  top:calc(100% + 6px);
+  right:0;
+  background:var(--surface);
+  border:1px solid var(--border);
+  min-width:140px;
+  z-index:3000;
+  display:none;
+  flex-direction:column;
+  box-shadow:0 8px 24px rgba(0,0,0,0.5);
+}
+.dropdown-menu.open{display:flex;}
+.dropdown-option {
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10px;
+  letter-spacing:1px;
+  padding:10px 14px;
+  background:transparent;
+  border:none;
+  color:var(--text);
+  cursor:pointer;
+  text-align:left;
+  display:flex;align-items:center;gap:8px;
+  transition:background 0.1s;
+  white-space:nowrap;
+}
+.dropdown-option:hover{background:rgba(255,255,255,0.06);}
+.dropdown-option.selected{color:var(--accent);}
+
+/* ── Info panel ── */
+.info-wrapper{position:relative;display:flex;align-items:center;}
+.info-panel {
+  display:none;
+  position:absolute;
+  top:calc(100% + 10px);
+  right:0;
+  background:var(--surface);
+  border:1px solid var(--border);
+  padding:0;
+  min-width:300px;
+  max-width:360px;
+  z-index:3000;
+  box-shadow:0 8px 32px rgba(0,0,0,0.5);
+}
+.info-panel.visible{display:block;}
+.info-panel-tabs {
+  display:flex;
+  border-bottom:1px solid var(--border);
+}
+.info-panel-tab {
+  font-family:'IBM Plex Mono',monospace;
+  font-size:9px;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  padding:10px 14px;
+  background:transparent;
+  border:none;
+  color:var(--muted);
+  cursor:pointer;
+  border-bottom:2px solid transparent;
+  transition:all 0.15s;
+}
+.info-panel-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.info-tab-content{display:none;padding:14px 16px;}
+.info-tab-content.active{display:block;}
+.info-tab-content p{font-size:12px;line-height:1.8;color:var(--text);margin-bottom:10px;}
+.info-tab-content p:last-child{margin-bottom:0;}
+.info-tab-content a{color:var(--accent);text-decoration:underline;}
+.other-tool-item{padding:10px 0;border-bottom:1px solid var(--border);}
+.other-tool-item:last-child{border-bottom:none;padding-bottom:0;}
+.other-tool-name{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent);text-decoration:none;letter-spacing:1px;display:block;margin-bottom:4px;}
+.other-tool-name:hover{text-decoration:underline;}
+.other-tool-desc{font-size:11px;color:var(--muted);line-height:1.6;}
+
+/* ── Color picker button ── */
+.color-picker-wrapper{position:relative;display:flex;align-items:center;gap:6px;}
+.color-dot {
+  width:14px;height:14px;
+  border-radius:50%;
+  border:2px solid var(--border);
+  background:#ffffff;
+  flex-shrink:0;
+}
+#wordColorInput {
+  position:absolute;
+  opacity:0;
+  width:0;height:0;
+  pointer-events:none;
+}
+.color-label {
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10px;
+  letter-spacing:1px;
+  color:var(--muted);
+  cursor:pointer;
+  border:1px solid var(--border);
+  padding:8px 12px;
+  display:flex;align-items:center;gap:8px;
+  transition:all 0.15s;
+}
+.color-label:hover{border-color:var(--accent);color:var(--accent);}
+
+/* ── Main upload area ── */
+#upload-screen {
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:40px 24px;
+  gap:32px;
+}
+.upload-container {
+  background:var(--surface);
+  border:1px solid var(--border);
+  padding:32px 36px;
+  width:100%;
+  max-width:480px;
+  display:flex;
+  flex-direction:column;
+  gap:20px;
+}
+.upload-title {
+  font-family:'Lexend',sans-serif;
+  font-size:20px;
+  letter-spacing:3px;
+  color:var(--accent);
+  text-align:center;
+}
+.upload-subtitle {
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10px;
+  letter-spacing:2px;
+  color:var(--muted);
+  text-align:center;
+  margin-top:-16px;
+}
+.upload-zone {
+  border:1px dashed var(--border);
+  padding:18px 20px;
+  text-align:center;
+  cursor:pointer;
+  transition:all 0.2s;
+  position:relative;
+}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--accent);background:rgba(255,255,255,0.03);}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.upload-zone .upload-icon{font-size:24px;margin-bottom:6px;}
+.upload-zone p{font-size:12px;color:var(--muted);}
+.upload-zone .filename{color:var(--accent);font-family:'IBM Plex Mono',monospace;font-size:11px;margin-top:6px;word-break:break-all;}
+.section-label {
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10px;
+  letter-spacing:3px;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin-bottom:8px;
+}
+.start-btn-wrap{display:flex;justify-content:center;}
+#startBtn{padding:12px 40px;font-size:12px;letter-spacing:3px;}
+.error-msg{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;
+  color:#ff6e6e;
+  border:1px solid #ff6e6e;
+  padding:10px 14px;
+  display:none;
+}
+.error-msg.visible{display:block;}
+
+/* ── Game screen ── */
+#game-screen {
+  display:none;
+  flex:1;
+  flex-direction:column;
+  position:relative;
+  overflow:hidden;
+}
+#game-screen.active{display:flex;}
+
+/* HUD */
+#hud {
+  display:flex;
+  align-items:center;
+  gap:24px;
+  padding:10px 24px;
+  border-bottom:1px solid var(--border);
+  background:var(--bg);
+  z-index:5;
+  flex-shrink:0;
+}
+.hud-item {
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;
+  color:var(--muted);
+  letter-spacing:1px;
+}
+.hud-item b{color:var(--accent);font-size:16px;}
+.hud-miss{color:#ff6e6e;}
+.hud-miss b{color:#ff6e6e !important;}
+#stopBtn{margin-left:auto;padding:6px 16px;font-size:10px;}
+
+/* Game field */
+#game-field {
+  flex:1;
+  position:relative;
+  background:#000000;
+  overflow:hidden;
+}
+
+/* Words */
+.game-word {
+  position:absolute;
+  font-family:'Lexend',sans-serif;
+  font-size:32px;
+  font-weight:400;
+  letter-spacing:2px;
+  padding:10px 22px;
+  border:1px solid;
+  transform:translate(-50%, -50%);
+  cursor:default;
+  user-select:none;
+  -webkit-user-select:none;
+  white-space:nowrap;
+}
+
+/* Ghost word */
+.ghost-word {
+  opacity:0;
+  pointer-events:auto;
+  cursor:pointer;
+  filter:blur(0px);
+  border-style:dashed;
+  border-color: var(--word-color);
+  color: var(--word-color);
+  transition: none;
+}
+.ghost-word.ghost-animate {
+  animation: ghostShrink var(--ghost-duration, 2s) linear forwards;
+}
+@keyframes ghostShrink {
+  0%   { opacity:0.7; transform:translate(-50%,-50%) scale(2.2); filter:blur(4px); }
+  70%  { opacity:0.55; }
+  90%  { opacity:0.8; transform:translate(-50%,-50%) scale(1.05); filter:blur(0px); }
+  100% { opacity:0; transform:translate(-50%,-50%) scale(1); filter:blur(0px); }
+}
+
+/* Main word */
+.main-word {
+  cursor:pointer;
+  border-style:solid;
+  color: var(--word-color);
+  border-color: var(--word-color);
+  text-shadow: 0 0 12px var(--word-color), 0 0 24px color-mix(in srgb, var(--word-color) 60%, transparent);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--word-color) 40%, transparent),
+              inset 0 0 8px color-mix(in srgb, var(--word-color) 10%, transparent);
+  animation: wordAppear 0.08s ease-out forwards;
+  transition: box-shadow 0.1s, transform 0.1s;
+}
+.main-word:hover {
+  transform:translate(-50%,-50%) scale(1.06);
+  box-shadow: 0 0 30px var(--word-color), inset 0 0 12px color-mix(in srgb, var(--word-color) 20%, transparent);
+}
+@keyframes wordAppear {
+  from{opacity:0;transform:translate(-50%,-50%) scale(0.85);}
+  to{opacity:1;transform:translate(-50%,-50%) scale(1);}
+}
+.main-word.hit-flash {
+  animation: hitFlash 0.3s ease forwards;
+}
+@keyframes hitFlash {
+  0%  {opacity:1;transform:translate(-50%,-50%) scale(1.12);}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(1.25);}
+}
+.main-word.miss-flash {
+  border-color:#ff4444;
+  color:#ff4444;
+  box-shadow:0 0 20px #ff4444;
+  animation: missFlash 0.5s ease forwards;
+}
+@keyframes missFlash {
+  0%  {opacity:1;}
+  60% {opacity:0.7;}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(0.7);}
+}
+
+/* Countdown overlay */
+#countdown-overlay {
+  position:absolute;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:50;
+  pointer-events:none;
+}
+#countdown-overlay.active{display:flex;}
+#countdown-num {
+  font-family:'Lexend',sans-serif;
+  font-size:clamp(80px,18vw,200px);
+  font-weight:300;
+  letter-spacing:6px;
+  color:#ffffff;
+  text-shadow:0 0 60px rgba(255,255,255,0.6);
+  animation: countPulse 0.8s ease;
+}
+@keyframes countPulse {
+  0%  {transform:scale(1.4);opacity:0;}
+  40% {opacity:1;}
+  100%{transform:scale(1);opacity:1;}
+}
+#countdown-num.go {
+  color: var(--word-color, #fff);
+  font-size: clamp(60px, 12vw, 140px);
+  letter-spacing: 8px;
+  text-shadow: 0 0 60px var(--word-color, #fff);
+}
+
+/* Waiting message */
+#waiting-msg {
+  position:absolute;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  font-family:'IBM Plex Mono',monospace;
+  font-size:13px;
+  letter-spacing:3px;
+  color:var(--muted);
+  text-align:center;
+  display:none;
+  pointer-events:none;
+  z-index:10;
+}
+#waiting-msg.visible{display:block;}
+#waiting-msg span {
+  display:block;
+  animation: blink 1.2s ease infinite;
+}
+@keyframes blink {
+  0%,100%{opacity:1;}50%{opacity:0.4;}
+}
+
+/* Hit label popup */
+.hit-label {
+  position:absolute;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:14px;
+  font-weight:700;
+  letter-spacing:3px;
+  pointer-events:none;
+  z-index:20;
+  transform:translate(-50%,-50%);
+  animation: hitLabelAnim 0.8s ease forwards;
+}
+.hit-label.rainbow {
+  background: linear-gradient(90deg,#ff6b6b,#ffb347,#ffe97e,#7eff9c,#7ef2ff,#c9a8f4);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+  filter:drop-shadow(0 0 8px rgba(255,255,255,0.5));
+}
+@keyframes hitLabelAnim {
+  0%  {opacity:1;transform:translate(-50%,-50%) translateY(0) scale(1);}
+  70% {opacity:1;}
+  100%{opacity:0;transform:translate(-50%,-50%) translateY(-40px) scale(0.9);}
+}
+
+/* Miss label */
+.miss-label {
+  position:absolute;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;
+  letter-spacing:2px;
+  color:#ff4444;
+  pointer-events:none;
+  z-index:20;
+  transform:translate(-50%,-50%);
+  animation: missLabelAnim 1s ease forwards;
+}
+.miss-word-name {
+  display:block;
+  font-size:9px;
+  opacity:0.7;
+  margin-top:2px;
+  letter-spacing:1px;
+  word-break:break-all;
+  max-width:120px;
+  text-align:center;
+}
+@keyframes missLabelAnim {
+  0%  {opacity:1;transform:translate(-50%,-50%) scale(1);}
+  60% {opacity:0.8;}
+  100%{opacity:0;transform:translate(-50%,-50%) translateY(20px) scale(0.85);}
+}
+
+/* End screen */
+#end-screen {
+  display:none;
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,0.92);
+  align-items:center;
+  justify-content:center;
+  z-index:100;
+  flex-direction:column;
+  gap:24px;
+  backdrop-filter:blur(4px);
+}
+#end-screen.active{display:flex;}
+.end-title {
+  font-family:'Lexend',sans-serif;
+  font-size:clamp(28px,5vw,56px);
+  letter-spacing:6px;
+  color:#ffffff;
+  text-shadow:0 0 30px rgba(255,255,255,0.5);
+}
+.end-stats {
+  display:flex;
+  gap:40px;
+  flex-wrap:wrap;
+  justify-content:center;
+}
+.end-stat {
+  text-align:center;
+  font-family:'IBM Plex Mono',monospace;
+}
+.end-stat-num {
+  font-size:clamp(32px,5vw,56px);
+  font-weight:700;
+  color:#ffffff;
+  display:block;
+}
+.end-stat-label {
+  font-size:10px;
+  letter-spacing:3px;
+  color:var(--muted);
+  margin-top:4px;
+  display:block;
+}
+.end-actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
+
+/* Toast */
+#toast {
+  position:fixed;
+  bottom:24px;right:24px;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;letter-spacing:1.5px;
+  padding:10px 18px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  color:var(--accent);
+  z-index:9999;
+  pointer-events:none;
+  transform:translateX(calc(100% + 40px));
+  opacity:0;
+  transition:transform 0.3s cubic-bezier(0.22,1,0.36,1), opacity 0.3s ease;
+}
+#toast.visible{transform:translateX(0);opacity:1;}
+#toast.err{color:#ff6e6e;border-color:#ff6e6e;}
+</style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <div class="logo">
+    TTML RHYME
+    <span>OSU-STYLE LYRIC GAME</span>
+  </div>
+  <div class="header-controls">
+
+    <!-- Color picker -->
+    <div class="color-picker-wrapper">
+      <label class="color-label" for="wordColorInput" id="colorLabel">
+        <span class="color-dot" id="colorDot"></span>
+        <span id="colorLabelText">WORD COLOR</span>
+      </label>
+      <input type="color" id="wordColorInput" value="#ffffff">
+    </div>
+
+    <!-- Dark/Light mode -->
+    <button class="icon-btn" id="themeToggleBtn" title="Toggle theme" onclick="toggleTheme()">☀️</button>
+
+    <!-- Language picker -->
+    <div class="dropdown-wrapper" id="langWrapper">
+      <button class="btn" id="langBtn" onclick="toggleLangDropdown()">EN ▾</button>
+      <div class="dropdown-menu" id="langDropdown">
+        <button class="dropdown-option selected" id="opt-en" onclick="setLang('en')">🇬🇧 English</button>
+        <button class="dropdown-option" id="opt-vi" onclick="setLang('vi')">🇻🇳 Tiếng Việt</button>
+      </div>
+    </div>
+
+    <!-- Info -->
+    <div class="info-wrapper" id="infoWrapper" onclick="toggleInfoPanel()">
+      <button class="icon-btn" title="Info">ⓘ</button>
+      <div class="info-panel" id="infoPanel">
+        <div class="info-panel-tabs">
+          <button class="info-panel-tab active" data-tab="how-to" onclick="switchInfoTab('how-to');event.stopPropagation();" id="tab-howto">How to play</button>
+          <button class="info-panel-tab" data-tab="create" onclick="switchInfoTab('create');event.stopPropagation();" id="tab-create">Create TTML</button>
+        </div>
+        <div class="info-tab-content active" data-tab="how-to" id="content-howto">
+          <p id="info-p1">Upload an audio file and its matching <b>.ttml</b> file, then press <b>START</b>.</p>
+          <p id="info-p2">Words will appear at random positions on screen, timed to the lyrics. <b>Click them</b> before they disappear!</p>
+          <p id="info-p3">A <b>ghost</b> circle previews where each word will appear 2 seconds before it shows up — just like osu!</p>
+          <p id="info-p4">Scoring: <b style="background:linear-gradient(90deg,#ff6b6b,#ffe97e,#7eff9c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">PERFECT</b> &lt;0.15s · <b style="color:#7ef2ff">GREAT</b> &lt;0.35s · <b style="color:#7eff9c">GOOD</b> &lt;0.55s · and more.</p>
+        </div>
+        <div class="info-tab-content" data-tab="create" id="content-create">
+          <div class="other-tool-item">
+            <a class="other-tool-name" href="https://ellinya19.github.io/Ellinya/SyncLyrics_Words/index.html" target="_blank" rel="noopener" id="create-tool-name">Create TTML — Word Sync Tool</a>
+            <span class="other-tool-desc" id="create-tool-desc">Use this tool to create word-level timed TTML files from your lyrics and audio.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</header>
+
+<!-- ── Upload Screen ── -->
+<div id="upload-screen">
+  <div class="upload-container">
+    <div class="upload-title" id="ui-title">TTML RHYME</div>
+    <div class="upload-subtitle" id="ui-subtitle">UPLOAD MUSIC &amp; LYRICS TO PLAY</div>
+
+    <div>
+      <div class="section-label" id="label-audio">01 — Audio File</div>
+      <div class="upload-zone" id="audioZone">
+        <input type="file" id="audioFile" accept="audio/*" onchange="onAudioFile(this)">
+        <div class="upload-icon">🎵</div>
+        <p id="audio-zone-p">Drop audio file here or click to browse</p>
+        <div class="filename" id="audioFilename"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label" id="label-ttml">02 — TTML File</div>
+      <div class="upload-zone" id="ttmlZone">
+        <input type="file" id="ttmlFile" accept=".ttml,.xml" onchange="onTTMLFile(this)">
+        <div class="upload-icon">📄</div>
+        <p id="ttml-zone-p">Drop .ttml file here or click to browse</p>
+        <div class="filename" id="ttmlFilename"></div>
+      </div>
+    </div>
+
+    <div class="error-msg" id="errorMsg"></div>
+
+    <div class="start-btn-wrap">
+      <button class="btn primary" id="startBtn" onclick="onStartClick()" disabled id="ui-start">START</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Game Screen ── -->
+<div id="game-screen">
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hud-item"><b id="hud-score">0</b> <span id="hud-score-label">pts</span></div>
+    <div class="hud-item" id="hud-combo-wrap">✕<b id="hud-combo">0</b> <span id="hud-combo-label">combo</span></div>
+    <div class="hud-item hud-miss">MISS: <b id="hud-miss">0</b></div>
+    <button class="btn" id="stopBtn" onclick="onStopClick()">STOP</button>
+  </div>
+
+  <!-- Field -->
+  <div id="game-field">
+    <div id="countdown-overlay">
+      <div id="countdown-num"></div>
+    </div>
+    <div id="waiting-msg"><span id="waiting-text">♪ Waiting for music...</span></div>
+  </div>
+
+  <!-- End screen -->
+  <div id="end-screen">
+    <div class="end-title" id="end-title">COMPLETE</div>
+    <div class="end-stats">
+      <div class="end-stat">
+        <span class="end-stat-num" id="end-score">0</span>
+        <span class="end-stat-label" id="end-score-label">SCORE</span>
+      </div>
+      <div class="end-stat">
+        <span class="end-stat-num" id="end-miss">0</span>
+        <span class="end-stat-label" id="end-miss-label">MISSES</span>
+      </div>
+      <div class="end-stat">
+        <span class="end-stat-num" id="end-acc">0%</span>
+        <span class="end-stat-label" id="end-acc-label">ACCURACY</span>
+      </div>
+    </div>
+    <div class="end-actions">
+      <button class="btn primary" onclick="onPlayAgain()" id="btn-play-again">PLAY AGAIN</button>
+      <button class="btn" onclick="onBackToMenu()" id="btn-back">BACK TO MENU</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script src="main.js"></script>
+<script>
+// ── State ──────────────────────────────────────────────────
+let currentLang = 'en';
+let isDark = true;
+let parsedWords = [];
+let audioDuration = 0;
+let wordColor = '#ffffff';
+let _audioFile = null;
+let _ttmlFile = null;
+let infoPanelOpen = false;
+let _countdownResolve = null;
+
+// ── Translations ───────────────────────────────────────────
+const T = {
+  en: {
+    'ui-title': 'TTML RHYME',
+    'ui-subtitle': 'UPLOAD MUSIC & LYRICS TO PLAY',
+    'label-audio': '01 — Audio File',
+    'label-ttml': '02 — TTML File',
+    'audio-zone-p': 'Drop audio file here or click to browse',
+    'ttml-zone-p': 'Drop .ttml file here or click to browse',
+    'ui-start': 'START',
+    'hud-score-label': 'pts',
+    'hud-combo-label': 'combo',
+    'stopBtn': 'STOP',
+    'end-title': 'COMPLETE',
+    'end-score-label': 'SCORE',
+    'end-miss-label': 'MISSES',
+    'end-acc-label': 'ACCURACY',
+    'btn-play-again': 'PLAY AGAIN',
+    'btn-back': 'BACK TO MENU',
+    'colorLabelText': 'WORD COLOR',
+    'tab-howto': 'How to play',
+    'tab-create': 'Create TTML',
+    'info-p1': 'Upload an audio file and its matching <b>.ttml</b> file, then press <b>START</b>.',
+    'info-p2': 'Words will appear at random positions on screen, timed to the lyrics. <b>Click them</b> before they disappear!',
+    'info-p3': 'A <b>ghost</b> circle previews where each word will appear 2 seconds before it shows up — just like osu!',
+    'info-p4': '<b style="background:linear-gradient(90deg,#ff6b6b,#ffe97e,#7eff9c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">PERFECT</b> &lt;0.15s · <b style="color:#7ef2ff">GREAT</b> &lt;0.35s · <b style="color:#7eff9c">GOOD</b> &lt;0.55s · and more.',
+    'create-tool-name': 'Create TTML — Word Sync Tool',
+    'create-tool-desc': 'Use this tool to create word-level timed TTML files from your lyrics and audio.',
+    'waiting-text': '♪ Waiting for music...',
+    'err-noaudio': 'Please upload an audio file.',
+    'err-nottml': 'Please upload a TTML file.',
+    'err-ttmllong': 'TTML duration exceeds audio duration. Please check your files.',
+    'err-nowords': 'No words found in TTML file.',
+    'miss-label': 'MISS',
+  },
+  vi: {
+    'ui-title': 'TTML RHYME',
+    'ui-subtitle': 'TẢI NHẠC VÀ LỜI BÀI HÁT ĐỂ CHƠI',
+    'label-audio': '01 — Tệp Âm Thanh',
+    'label-ttml': '02 — Tệp TTML',
+    'audio-zone-p': 'Thả tệp âm thanh vào đây hoặc nhấp để duyệt',
+    'ttml-zone-p': 'Thả tệp .ttml vào đây hoặc nhấp để duyệt',
+    'ui-start': 'BẮT ĐẦU',
+    'hud-score-label': 'điểm',
+    'hud-combo-label': 'combo',
+    'stopBtn': 'DỪNG',
+    'end-title': 'HOÀN THÀNH',
+    'end-score-label': 'ĐIỂM',
+    'end-miss-label': 'BỎ LỠ',
+    'end-acc-label': 'ĐỘ CHÍNH XÁC',
+    'btn-play-again': 'CHƠI LẠI',
+    'btn-back': 'QUAY LẠI',
+    'colorLabelText': 'MÀU CHỮ',
+    'tab-howto': 'Hướng dẫn',
+    'tab-create': 'Tạo TTML',
+    'info-p1': 'Tải lên tệp âm thanh và tệp <b>.ttml</b> tương ứng, sau đó nhấn <b>BẮT ĐẦU</b>.',
+    'info-p2': 'Các từ sẽ xuất hiện ở vị trí ngẫu nhiên trên màn hình, theo thời gian lời bài hát. <b>Nhấn vào chúng</b> trước khi biến mất!',
+    'info-p3': '<b>Bóng ma</b> sẽ báo trước vị trí từ sẽ xuất hiện 2 giây trước — giống osu!',
+    'info-p4': '<b style="background:linear-gradient(90deg,#ff6b6b,#ffe97e,#7eff9c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">PERFECT</b> &lt;0.15s · <b style="color:#7ef2ff">GREAT</b> &lt;0.35s · <b style="color:#7eff9c">GOOD</b> &lt;0.55s · và nhiều hơn.',
+    'create-tool-name': 'Tạo TTML — Công Cụ Sync Từng Từ',
+    'create-tool-desc': 'Dùng công cụ này để tạo tệp TTML có thời gian từng từ từ lời bài hát và âm thanh.',
+    'waiting-text': '♪ Đang chờ nhạc nền...',
+    'err-noaudio': 'Vui lòng tải lên tệp âm thanh.',
+    'err-nottml': 'Vui lòng tải lên tệp TTML.',
+    'err-ttmllong': 'Thời lượng TTML vượt quá thời lượng âm thanh. Vui lòng kiểm tra lại tệp.',
+    'err-nowords': 'Không tìm thấy từ nào trong tệp TTML.',
+    'miss-label': 'BỎ LỠ',
+    'stopBtn': 'DỪNG',
+  }
+};
+
+function t(key) { return T[currentLang][key] || T['en'][key] || key; }
+
+function applyTranslations() {
+  const keys = Object.keys(T.en);
+  keys.forEach(key => {
+    const el = document.getElementById(key);
+    if (!el) return;
+    if (['info-p1','info-p2','info-p3','info-p4','create-tool-desc'].includes(key)) {
+      el.innerHTML = t(key);
+    } else {
+      el.textContent = t(key);
+    }
+  });
+  // Update create-tool-name
+  const ctEl = document.getElementById('create-tool-name');
+  if (ctEl) ctEl.textContent = t('create-tool-name');
+  // Update start btn
+  document.getElementById('startBtn').textContent = t('ui-start');
+  document.getElementById('stopBtn').textContent = t('stopBtn');
+  document.getElementById('colorLabelText').textContent = t('colorLabelText');
+}
+
+// ── Language ───────────────────────────────────────────────
+function setLang(lang) {
+  currentLang = lang;
+  applyTranslations();
+  document.getElementById('langBtn').textContent = lang === 'vi' ? 'VI ▾' : 'EN ▾';
+  document.getElementById('opt-en').classList.toggle('selected', lang === 'en');
+  document.getElementById('opt-vi').classList.toggle('selected', lang === 'vi');
+  closeLangDropdown();
+}
+function toggleLangDropdown() {
+  document.getElementById('langDropdown').classList.toggle('open');
+}
+function closeLangDropdown() {
+  document.getElementById('langDropdown').classList.remove('open');
+}
+
+// ── Theme ──────────────────────────────────────────────────
+function toggleTheme() {
+  isDark = !isDark;
+  document.body.classList.toggle('light-mode', !isDark);
+  document.getElementById('themeToggleBtn').textContent = isDark ? '☀️' : '🌙';
+}
+
+// ── Info Panel ─────────────────────────────────────────────
+function toggleInfoPanel() {
+  infoPanelOpen = !infoPanelOpen;
+  document.getElementById('infoPanel').classList.toggle('visible', infoPanelOpen);
+}
+function switchInfoTab(tab) {
+  document.querySelectorAll('.info-panel-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.info-tab-content').forEach(c => c.classList.toggle('active', c.dataset.tab === tab));
+}
+
+// ── Color Picker ───────────────────────────────────────────
+document.getElementById('wordColorInput').addEventListener('input', (e) => {
+  wordColor = e.target.value;
+  document.getElementById('colorDot').style.background = wordColor;
+  document.getElementById('game-field')?.style.setProperty('--word-color', wordColor);
+  Game.setWordColor(wordColor);
+});
+
+// ── File Inputs ────────────────────────────────────────────
+async function onAudioFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  _audioFile = file;
+  document.getElementById('audioFilename').textContent = file.name;
+  showError('');
+  try {
+    audioDuration = await Game.loadAudio(file);
+    checkFilesReady();
+  } catch (e) {
+    showError('Could not decode audio file: ' + e.message);
+  }
+}
+
+function onTTMLFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  _ttmlFile = file;
+  document.getElementById('ttmlFilename').textContent = file.name;
+  showError('');
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      parsedWords = Game.parseTTML(e.target.result);
+      if (!parsedWords.length) {
+        showError(t('err-nowords'));
+        return;
+      }
+      // Validate if audio already loaded
+      if (audioDuration > 0) {
+        const v = Game.validateFiles(audioDuration, parsedWords);
+        if (!v.ok) { showError(t('err-ttmllong')); return; }
+      }
+      checkFilesReady();
+      showToast(`✓ ${parsedWords.length} words loaded`);
+    } catch (ex) {
+      showError('TTML parse error: ' + ex.message);
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+function checkFilesReady() {
+  const ready = parsedWords.length > 0 && audioDuration > 0;
+  document.getElementById('startBtn').disabled = !ready;
+  if (ready && audioDuration > 0 && parsedWords.length > 0) {
+    const v = Game.validateFiles(audioDuration, parsedWords);
+    if (!v.ok) {
+      showError(t('err-ttmllong'));
+      document.getElementById('startBtn').disabled = true;
+    }
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.classList.toggle('visible', !!msg);
+}
+
+// ── Start / Stop ───────────────────────────────────────────
+async function onStartClick() {
+  if (!parsedWords.length) { showError(t('err-nottml')); return; }
+  if (audioDuration === 0) { showError(t('err-noaudio')); return; }
+
+  showError('');
+  document.getElementById('upload-screen').style.display = 'none';
+  document.getElementById('game-screen').classList.add('active');
+  document.getElementById('end-screen').classList.remove('active');
+  document.getElementById('game-field').innerHTML =
+    `<div id="countdown-overlay"><div id="countdown-num"></div></div>` +
+    `<div id="waiting-msg"><span id="waiting-text">${t('waiting-text')}</span></div>`;
+
+  // Reset HUD
+  updateHUD(0, 0, 0);
+
+  // Set up callbacks
+  Game.setCallbacks({
+    onScoreUpdate: ({ score, combo, missCount }) => updateHUD(score, combo, missCount),
+    onMiss: ({ word, x, y }) => showMissLabel(word, x, y),
+    onGameEnd: ({ score, missCount, total }) => showEndScreen(score, missCount, total),
+    onCountdown: (n) => showCountdown(n),
+    onWaiting: (firstTime) => {
+      const wm = document.getElementById('waiting-msg');
+      if (wm) { wm.classList.add('visible'); wm.querySelector('#waiting-text').textContent = t('waiting-text'); }
+      // Hide waiting message just before countdown
+      setTimeout(() => { if (wm) wm.classList.remove('visible'); }, Math.max(0, (firstTime - 5) * 1000 - 500));
+    },
+    onWordHit: ({ label, color, x, y }) => showHitLabel(label, color, x, y),
+  });
+
+  // Apply word color
+  document.getElementById('game-field').style.setProperty('--word-color', wordColor);
+  Game.setWordColor(wordColor);
+
+  await Game.startGame(parsedWords, wordColor);
+}
+
+function onStopClick() {
+  Game.stopGame();
+  onBackToMenu();
+}
+
+function onPlayAgain() {
+  document.getElementById('end-screen').classList.remove('active');
+  document.getElementById('game-field').innerHTML =
+    `<div id="countdown-overlay"><div id="countdown-num"></div></div>` +
+    `<div id="waiting-msg"><span id="waiting-text">${t('waiting-text')}</span></div>`;
+  updateHUD(0, 0, 0);
+  Game.setCallbacks({
+    onScoreUpdate: ({ score, combo, missCount }) => updateHUD(score, combo, missCount),
+    onMiss: ({ word, x, y }) => showMissLabel(word, x, y),
+    onGameEnd: ({ score, missCount, total }) => showEndScreen(score, missCount, total),
+    onCountdown: (n) => showCountdown(n),
+    onWaiting: (firstTime) => {
+      const wm = document.getElementById('waiting-msg');
+      if (wm) { wm.classList.add('visible'); wm.querySelector('#waiting-text').textContent = t('waiting-text'); }
+      setTimeout(() => { if (wm) wm.classList.remove('visible'); }, Math.max(0, (firstTime - 5) * 1000 - 500));
+    },
+    onWordHit: ({ label, color, x, y }) => showHitLabel(label, color, x, y),
+  });
+  document.getElementById('game-field').style.setProperty('--word-color', wordColor);
+  Game.startGame(parsedWords, wordColor);
+}
+
+function onBackToMenu() {
+  Game.stopGame();
+  document.getElementById('game-screen').classList.remove('active');
+  document.getElementById('upload-screen').style.display = '';
+  document.getElementById('end-screen').classList.remove('active');
+}
+
+// ── HUD update ─────────────────────────────────────────────
+function updateHUD(score, combo, missCount) {
+  document.getElementById('hud-score').textContent = score;
+  document.getElementById('hud-combo').textContent = combo;
+  document.getElementById('hud-miss').textContent = missCount;
+}
+
+// ── Countdown ──────────────────────────────────────────────
+function showCountdown(n) {
+  const overlay = document.getElementById('countdown-overlay');
+  const numEl = document.getElementById('countdown-num');
+  if (!overlay || !numEl) return;
+  overlay.classList.add('active');
+  if (n <= 0) {
+    numEl.textContent = currentLang === 'vi' ? 'VÀO!' : 'GO!';
+    numEl.classList.add('go');
+    numEl.style.setProperty('--word-color', wordColor);
+    setTimeout(() => {
+      overlay.classList.remove('active');
+      numEl.classList.remove('go');
+    }, 800);
+  } else {
+    numEl.textContent = n;
+    numEl.classList.remove('go');
+  }
+  // Pulse re-trigger
+  numEl.style.animation = 'none';
+  requestAnimationFrame(() => { numEl.style.animation = ''; });
+}
+
+// ── Hit label ─────────────────────────────────────────────
+function showHitLabel(label, color, x, y) {
+  const field = document.getElementById('game-field');
+  if (!field) return;
+  const el = document.createElement('div');
+  el.className = 'hit-label' + (color === 'rainbow' ? ' rainbow' : '');
+  el.textContent = label;
+  if (color !== 'rainbow') el.style.color = color;
+  el.style.left = x;
+  el.style.top = y;
+  field.appendChild(el);
+  setTimeout(() => el.remove(), 900);
+}
+
+// ── Miss label ────────────────────────────────────────────
+function showMissLabel(word, x, y) {
+  const field = document.getElementById('game-field');
+  if (!field) return;
+  const el = document.createElement('div');
+  el.className = 'miss-label';
+  el.innerHTML = `${t('miss-label')}<span class="miss-word-name">${word}</span>`;
+  el.style.left = x;
+  el.style.top = y;
+  field.appendChild(el);
+  setTimeout(() => el.remove(), 1100);
+}
+
+// ── End screen ────────────────────────────────────────────
+function showEndScreen(score, missCount, total) {
+  const acc = total > 0 ? Math.round((score / total) * 100) : 0;
+  document.getElementById('end-score').textContent = score;
+  document.getElementById('end-miss').textContent = missCount;
+  document.getElementById('end-acc').textContent = acc + '%';
+  document.getElementById('end-title').textContent = t('end-title');
+  document.getElementById('end-score-label').textContent = t('end-score-label');
+  document.getElementById('end-miss-label').textContent = t('end-miss-label');
+  document.getElementById('end-acc-label').textContent = t('end-acc-label');
+  document.getElementById('btn-play-again').textContent = t('btn-play-again');
+  document.getElementById('btn-back').textContent = t('btn-back');
+  document.getElementById('end-screen').classList.add('active');
+}
+
+// ── Toast ─────────────────────────────────────────────────
+let _toastTimer = null;
+function showToast(msg, isErr) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = isErr ? 'err' : '';
+  void el.offsetWidth;
+  el.classList.add('visible');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('visible'), 3000);
+}
+
+// ── Close dropdowns on outside click ──────────────────────
+document.addEventListener('click', (e) => {
+  if (!document.getElementById('langWrapper').contains(e.target)) closeLangDropdown();
+  if (!document.getElementById('infoWrapper').contains(e.target)) {
+    infoPanelOpen = false;
+    document.getElementById('infoPanel').classList.remove('visible');
+  }
+});
+
+// ── Drag & Drop on upload zones ───────────────────────────
+['audioZone','ttmlZone'].forEach(zoneId => {
+  const zone = document.getElementById(zoneId);
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    if (zoneId === 'audioZone' && file.type.startsWith('audio/')) {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      document.getElementById('audioFile').files = dt.files;
+      onAudioFile(document.getElementById('audioFile'));
+    } else if (zoneId === 'ttmlZone' && (file.name.endsWith('.ttml') || file.name.endsWith('.xml'))) {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      document.getElementById('ttmlFile').files = dt.files;
+      onTTMLFile(document.getElementById('ttmlFile'));
+    }
+  });
+});
+
+// ── Init ──────────────────────────────────────────────────
+applyTranslations();
+document.getElementById('colorDot').style.background = wordColor;
+</script>
+</body>
+</html>
