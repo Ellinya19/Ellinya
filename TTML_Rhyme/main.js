@@ -26,7 +26,7 @@ const Game = (() => {
   let wordColor = '#ffffff';
 
   // ── Constants ────────────────────────────────────────────
-  const GHOST_LEAD = 1.6;      // Ghost appears N seconds before main word
+  const GHOST_LEAD = 1.4;      // Ghost appears N seconds before main word
   const WORD_LINGER = 3.0;     // Word stays on screen N seconds before auto-miss
   const TIMING_WINDOWS = [
     { label: 'PERFECT', maxDelta: 0.15, color: 'rainbow' },
