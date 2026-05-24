@@ -327,16 +327,27 @@ header {
 .game-word {
   position:absolute;
   font-family:'Lexend',sans-serif;
-  font-size:44px;
-  font-weight:400;
-  letter-spacing:2px;
-  padding:14px 34px;
-  border:1px solid;
+  font-size:clamp(9px,1.8vmin,18px);
+  font-weight:500;
+  letter-spacing:1px;
+  width:110px;
+  height:110px;
+  border:2px solid;
+  border-radius:50%;
   transform:translate(-50%, -50%);
   cursor:default;
   user-select:none;
   -webkit-user-select:none;
   white-space:nowrap;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  overflow:hidden;
+  padding:8px;
+  word-break:break-word;
+  white-space:normal;
+  line-height:1.2;
 }
 
 /* Ghost word */
@@ -354,10 +365,17 @@ header {
   animation: ghostShrink var(--ghost-duration, 2s) linear forwards;
 }
 @keyframes ghostShrink {
-  0%   { opacity:0.7; transform:translate(-50%,-50%) scale(2.2); filter:blur(4px); }
-  70%  { opacity:0.55; }
-  90%  { opacity:0.8; transform:translate(-50%,-50%) scale(1.05); filter:blur(0px); }
-  100% { opacity:0; transform:translate(-50%,-50%) scale(1); filter:blur(0px); }
+  0%   { opacity:0.7; transform:translate(-50%,-50%) scale(1.8); filter:blur(3px); }
+  70%  { opacity:0.55; filter:blur(1px); }
+  95%  { opacity:0.85; transform:translate(-50%,-50%) scale(1.02); filter:blur(0px); }
+  100% { opacity:0.9; transform:translate(-50%,-50%) scale(1); filter:blur(0px); }
+}
+.ghost-word.ghost-snap {
+  animation: ghostSnapOut 0.08s linear forwards;
+}
+@keyframes ghostSnapOut {
+  0%   { opacity:0.9; transform:translate(-50%,-50%) scale(1); }
+  100% { opacity:0; transform:translate(-50%,-50%) scale(1); }
 }
 
 /* Main word */
@@ -369,7 +387,6 @@ header {
   text-shadow: 0 0 12px var(--word-color), 0 0 24px color-mix(in srgb, var(--word-color) 60%, transparent);
   box-shadow: 0 0 16px color-mix(in srgb, var(--word-color) 40%, transparent),
               inset 0 0 8px color-mix(in srgb, var(--word-color) 10%, transparent);
-  animation: wordAppear 0.08s ease-out forwards;
   transition: box-shadow 0.1s, transform 0.1s;
 }
 .main-word:hover {
@@ -417,18 +434,31 @@ header {
   letter-spacing:6px;
   color:#ffffff;
   text-shadow:0 0 60px rgba(255,255,255,0.6);
-  animation: countPulse 0.8s ease;
+  animation: countPulse 0.85s cubic-bezier(0.22,1,0.36,1) both;
 }
 @keyframes countPulse {
-  0%  {transform:scale(1.4);opacity:0;}
-  40% {opacity:1;}
-  100%{transform:scale(1);opacity:1;}
+  0%   {transform:scale(2.2);opacity:0;filter:blur(8px);}
+  50%  {opacity:1;filter:blur(0px);}
+  100% {transform:scale(1);opacity:1;filter:blur(0px);}
 }
 #countdown-num.go {
   color: var(--word-color, #fff);
   font-size: clamp(60px, 12vw, 140px);
   letter-spacing: 8px;
   text-shadow: 0 0 60px var(--word-color, #fff);
+  animation: goAppear 0.4s cubic-bezier(0.22,1,0.36,1) forwards;
+}
+@keyframes goAppear {
+  0%   {transform:scale(0.7);opacity:0;filter:blur(4px);}
+  60%  {transform:scale(1.08);opacity:1;filter:blur(0px);}
+  100% {transform:scale(1);opacity:1;}
+}
+#countdown-num.go-fade {
+  animation: goFadeOut 0.55s ease forwards;
+}
+@keyframes goFadeOut {
+  0%   {opacity:1;transform:scale(1);}
+  100% {opacity:0;transform:scale(1.3);filter:blur(6px);}
 }
 
 /* Waiting message */
@@ -580,6 +610,75 @@ header {
 }
 #toast.visible{transform:translateX(0);opacity:1;}
 #toast.err{color:#ff6e6e;border-color:#ff6e6e;}
+
+/* ── Pause overlay ── */
+#pause-overlay {
+  display:none;
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,0.88);
+  align-items:center;
+  justify-content:center;
+  z-index:200;
+  backdrop-filter:blur(6px);
+}
+#pause-overlay.active{display:flex;}
+.pause-box {
+  border:1px solid rgba(255,255,255,0.2);
+  padding:48px 64px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:28px;
+}
+.pause-title {
+  font-family:'Lexend',sans-serif;
+  font-size:clamp(24px,4vw,48px);
+  letter-spacing:6px;
+  color:#ffffff;
+  text-shadow:0 0 30px rgba(255,255,255,0.4);
+}
+.pause-actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
+#pauseBtn{margin-left:auto;padding:6px 16px;font-size:10px;}
+
+/* ── Swipe word ── */
+.swipe-word {
+  cursor:grab;
+}
+.swipe-word:active {
+  cursor:grabbing;
+}
+.swipe-trail {
+  position:absolute;
+  pointer-events:none;
+  z-index:4;
+}
+.ghost-swipe-trail {
+  position:absolute;
+  pointer-events:none;
+  z-index:3;
+  animation: ghostLineFadeIn var(--ghost-line-duration, 1s) linear forwards;
+}
+@keyframes ghostLineFadeIn {
+  0%   { opacity:0; }
+  100% { opacity:1; }
+}
+.swipe-target-dot {
+  position:absolute;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  border:2px solid var(--word-color, #ffffff);
+  opacity:0.7;
+  transform:translate(-50%,-50%);
+  pointer-events:none;
+  z-index:4;
+  animation: targetPulse 0.8s ease infinite;
+}
+@keyframes targetPulse {
+  0%,100%{opacity:0.7;transform:translate(-50%,-50%) scale(1);}
+  50%{opacity:1;transform:translate(-50%,-50%) scale(1.2);}
+}
 </style>
 </head>
 <body>
@@ -676,7 +775,7 @@ header {
     <div class="hud-item"><b id="hud-score">0</b> <span id="hud-score-label">pts</span></div>
     <div class="hud-item" id="hud-combo-wrap">✕<b id="hud-combo">0</b> <span id="hud-combo-label">combo</span></div>
     <div class="hud-item hud-miss">MISS: <b id="hud-miss">0</b></div>
-    <button class="btn" id="stopBtn" onclick="onStopClick()">STOP</button>
+    <button class="btn" id="pauseBtn" onclick="onPauseClick()">PAUSE</button>
   </div>
 
   <!-- Field -->
@@ -685,6 +784,16 @@ header {
       <div id="countdown-num"></div>
     </div>
     <div id="waiting-msg"><span id="waiting-text">♪ Waiting for music...</span></div>
+    <div id="pause-overlay">
+      <div class="pause-box">
+        <div class="pause-title" id="pause-title">PAUSED</div>
+        <div class="pause-actions">
+          <button class="btn primary" id="btn-resume" onclick="onResumeClick()">RESUME</button>
+          <button class="btn" id="btn-restart" onclick="onRestartClick()">RESTART</button>
+          <button class="btn" style="color:#ff6e6e;border-color:#ff6e6e;" id="btn-quit" onclick="onQuitClick()">QUIT</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- End screen -->
@@ -723,6 +832,9 @@ let currentLang = 'en';
 let parsedWords = [];
 let audioDuration = 0;
 let wordColor = '#ffffff';
+  let lastHitIdx = -1;          // Index of last successfully hit word (enforce sequential)
+  let isPaused = false;
+  let pausedAt = 0;             // AudioContext time when paused
 let _audioFile = null;
 let _ttmlFile = null;
 let infoPanelOpen = false;
@@ -740,7 +852,11 @@ const T = {
     'ui-start': 'START',
     'hud-score-label': 'pts',
     'hud-combo-label': 'combo',
-    'stopBtn': 'STOP',
+    'pauseBtn': 'PAUSE',
+    'pause-title': 'PAUSED',
+    'btn-resume': 'RESUME',
+    'btn-restart': 'RESTART',
+    'btn-quit': 'QUIT',
     'end-title': 'COMPLETE',
     'end-score-label': 'SCORE',
     'end-miss-label': 'MISSES',
@@ -773,7 +889,11 @@ const T = {
     'ui-start': 'BẮT ĐẦU',
     'hud-score-label': 'điểm',
     'hud-combo-label': 'combo',
-    'stopBtn': 'DỪNG',
+    'pauseBtn': 'TẠM DỪNG',
+    'pause-title': 'TẠM DỪNG',
+    'btn-resume': 'TIẾP TỤC',
+    'btn-restart': 'CHƠI LẠI',
+    'btn-quit': 'THOÁT',
     'end-title': 'HOÀN THÀNH',
     'end-score-label': 'ĐIỂM',
     'end-miss-label': 'BỎ LỠ',
@@ -794,7 +914,6 @@ const T = {
     'err-ttmllong': 'Thời lượng TTML vượt quá thời lượng âm thanh. Vui lòng kiểm tra lại tệp.',
     'err-nowords': 'Không tìm thấy từ nào trong tệp TTML.',
     'miss-label': 'BỎ LỠ',
-    'stopBtn': 'DỪNG',
   }
 };
 
@@ -816,8 +935,14 @@ function applyTranslations() {
   if (ctEl) ctEl.textContent = t('create-tool-name');
   // Update start btn
   document.getElementById('startBtn').textContent = t('ui-start');
-  document.getElementById('stopBtn').textContent = t('stopBtn');
+  const pb = document.getElementById('pauseBtn');
+  if (pb) pb.textContent = t('pauseBtn');
   document.getElementById('colorLabelText').textContent = t('colorLabelText');
+  // Update pause overlay texts if present in DOM
+  ['pause-title','btn-resume','btn-restart','btn-quit'].forEach(k => {
+    const el = document.getElementById(k);
+    if (el) el.textContent = t(k);
+  });
 }
 
 // ── Language ───────────────────────────────────────────────
@@ -920,50 +1045,54 @@ function showError(msg) {
 async function onStartClick() {
   if (!parsedWords.length) { showError(t('err-nottml')); return; }
   if (audioDuration === 0) { showError(t('err-noaudio')); return; }
-
   showError('');
   document.getElementById('upload-screen').style.display = 'none';
   document.getElementById('game-screen').classList.add('active');
-  document.getElementById('end-screen').classList.remove('active');
-  document.getElementById('game-field').innerHTML =
-    `<div id="countdown-overlay"><div id="countdown-num"></div></div>` +
-    `<div id="waiting-msg"><span id="waiting-text">${t('waiting-text')}</span></div>`;
-
-  // Reset HUD
-  updateHUD(0, 0, 0);
-
-  // Set up callbacks
-  Game.setCallbacks({
-    onScoreUpdate: ({ score, combo, missCount }) => updateHUD(score, combo, missCount),
-    onMiss: ({ word, x, y }) => showMissLabel(word, x, y),
-    onGameEnd: ({ score, missCount, total }) => showEndScreen(score, missCount, total),
-    onCountdown: (n) => showCountdown(n),
-    onWaiting: (firstTime) => {
-      const wm = document.getElementById('waiting-msg');
-      if (wm) { wm.classList.add('visible'); wm.querySelector('#waiting-text').textContent = t('waiting-text'); }
-      // Hide waiting message just before countdown
-      setTimeout(() => { if (wm) wm.classList.remove('visible'); }, Math.max(0, (firstTime - 5) * 1000 - 500));
-    },
-    onWordHit: ({ label, color, x, y }) => showHitLabel(label, color, x, y),
-  });
-
-  // Apply word color
-  document.getElementById('game-field').style.setProperty('--word-color', wordColor);
-  Game.setWordColor(wordColor);
-
-  await Game.startGame(parsedWords, wordColor);
+  _doStartGame();
 }
 
-function onStopClick() {
+let _isPaused = false;
+
+function onPauseClick() {
+  _isPaused = true;
+  Game.pauseGame();
+  document.getElementById('pause-overlay').classList.add('active');
+}
+
+function onResumeClick() {
+  _isPaused = false;
+  document.getElementById('pause-overlay').classList.remove('active');
+  Game.resumeGame();
+}
+
+function onRestartClick() {
+  _isPaused = false;
+  document.getElementById('pause-overlay').classList.remove('active');
+  Game.stopGame();
+  _doStartGame();
+}
+
+function onQuitClick() {
+  _isPaused = false;
+  document.getElementById('pause-overlay').classList.remove('active');
   Game.stopGame();
   onBackToMenu();
 }
 
-function onPlayAgain() {
+function _doStartGame() {
   document.getElementById('end-screen').classList.remove('active');
-  document.getElementById('game-field').innerHTML =
+  const field = document.getElementById('game-field');
+  // Preserve pause-overlay, only reset inner game elements
+  field.innerHTML =
     `<div id="countdown-overlay"><div id="countdown-num"></div></div>` +
-    `<div id="waiting-msg"><span id="waiting-text">${t('waiting-text')}</span></div>`;
+    `<div id="waiting-msg"><span id="waiting-text">${t('waiting-text')}</span></div>` +
+    `<div id="pause-overlay"><div class="pause-box">` +
+    `<div class="pause-title" id="pause-title">${t('pause-title')}</div>` +
+    `<div class="pause-actions">` +
+    `<button class="btn primary" id="btn-resume" onclick="onResumeClick()">${t('btn-resume')}</button>` +
+    `<button class="btn" id="btn-restart" onclick="onRestartClick()">${t('btn-restart')}</button>` +
+    `<button class="btn" style="color:#ff6e6e;border-color:#ff6e6e;" id="btn-quit" onclick="onQuitClick()">${t('btn-quit')}</button>` +
+    `</div></div></div>`;
   updateHUD(0, 0, 0);
   Game.setCallbacks({
     onScoreUpdate: ({ score, combo, missCount }) => updateHUD(score, combo, missCount),
@@ -977,8 +1106,13 @@ function onPlayAgain() {
     },
     onWordHit: ({ label, color, x, y }) => showHitLabel(label, color, x, y),
   });
-  document.getElementById('game-field').style.setProperty('--word-color', wordColor);
+  field.style.setProperty('--word-color', wordColor);
+  Game.setWordColor(wordColor);
   Game.startGame(parsedWords, wordColor);
+}
+
+function onPlayAgain() {
+  _doStartGame();
 }
 
 function onBackToMenu() {
@@ -1001,21 +1135,29 @@ function showCountdown(n) {
   const numEl = document.getElementById('countdown-num');
   if (!overlay || !numEl) return;
   overlay.classList.add('active');
+
   if (n <= 0) {
+    // GO: appear then fade out
     numEl.textContent = currentLang === 'vi' ? 'VÀO!' : 'GO!';
-    numEl.classList.add('go');
     numEl.style.setProperty('--word-color', wordColor);
+    numEl.className = '';
+    void numEl.offsetWidth; // force reflow
+    numEl.classList.add('go');
     setTimeout(() => {
-      overlay.classList.remove('active');
       numEl.classList.remove('go');
-    }, 800);
+      numEl.classList.add('go-fade');
+      setTimeout(() => {
+        overlay.classList.remove('active');
+        numEl.classList.remove('go-fade');
+      }, 560);
+    }, 500);
   } else {
-    numEl.textContent = n;
-    numEl.classList.remove('go');
+    // Numbers: clone trick to reliably restart animation
+    numEl.classList.remove('go', 'go-fade');
+    const fresh = numEl.cloneNode(false);
+    fresh.textContent = n;
+    numEl.parentNode.replaceChild(fresh, numEl);
   }
-  // Pulse re-trigger
-  numEl.style.animation = 'none';
-  requestAnimationFrame(() => { numEl.style.animation = ''; });
 }
 
 // ── Hit label ─────────────────────────────────────────────

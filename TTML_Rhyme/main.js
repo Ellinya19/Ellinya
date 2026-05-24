@@ -26,8 +26,11 @@ const Game = (() => {
   let wordColor = '#ffffff';
 
   // ── Constants ────────────────────────────────────────────
-  const GHOST_LEAD = 1.4;      // Ghost appears N seconds before main word
-  const WORD_LINGER = 3.0;     // Word stays on screen N seconds before auto-miss
+  const GHOST_LEAD = 2.0;      // Ghost appears N seconds before main word
+  const WORD_LINGER = 2.1;     // Word stays on screen N seconds before auto-miss
+  const SWIPE_MIN_GAP = 2.0;   // Min gap to next word (seconds) to become swipe
+  const SWIPE_MAX_GAP = 5.0;   // Max gap to next word (seconds) to become swipe
+  const SWIPE_PX_PER_SEC = 60; // Pixels per second of gap for swipe distance
   const TIMING_WINDOWS = [
     { label: 'PERFECT', maxDelta: 0.15, color: 'rainbow' },
     { label: 'GREAT',   maxDelta: 0.35, color: '#7ef2ff' },
@@ -185,6 +188,13 @@ const Game = (() => {
       if (w.end !== null) w.end = Math.max(0, w.end - TTML_OFFSET);
     });
 
+    // Mark swipe words: gap to next word is 2–5 seconds
+    for (let i = 0; i < filtered.length - 1; i++) {
+      const gap = filtered[i + 1].begin - filtered[i].begin;
+      filtered[i]._isSwipe = gap >= SWIPE_MIN_GAP && gap <= SWIPE_MAX_GAP;
+    }
+    filtered[filtered.length - 1]._isSwipe = false;
+
     return filtered;
   }
 
@@ -214,6 +224,7 @@ const Game = (() => {
   // ── Current audio time (accurate) ────────────────────────
   function getCurrentTime() {
     if (!isPlaying || !audioContext) return audioOffsetTime;
+    if (isPaused) return audioOffsetTime + (pausedAt - audioStartTime);
     return audioOffsetTime + (audioContext.currentTime - audioStartTime);
   }
 
@@ -226,6 +237,8 @@ const Game = (() => {
     missCount = 0;
     combo = 0;
     wordIdCounter = 0;
+    lastHitIdx = -1;
+    isPaused = false;
     gameRunning = true;
     gameStarted = false;
     activeWords.clear();
@@ -376,8 +389,74 @@ const Game = (() => {
     container.appendChild(el);
     activeWords.set(id, { el, word, isGhost: true });
 
+    // If swipe word: pre-calculate target and draw ghost line
+    if (word._isSwipe) {
+      const cw = container.offsetWidth  || window.innerWidth;
+      const ch = container.offsetHeight || window.innerHeight;
+      const BOX = 110;
+      const MARGIN = BOX / 2 + 10;
+      const ox = (px / 100) * cw;
+      const oy = (py / 100) * ch;
+      const minDist = SWIPE_PX_PER_SEC * SWIPE_MIN_GAP;
+      const maxDist = SWIPE_PX_PER_SEC * SWIPE_MAX_GAP;
+      const dist = minDist + Math.random() * (maxDist - minDist);
+      let angle, tx, ty, tries3 = 0;
+      do {
+        angle = Math.random() * 2 * Math.PI;
+        tx = ox + Math.cos(angle) * dist;
+        ty = oy + Math.sin(angle) * dist;
+        tries3++;
+      } while (
+        tries3 < 40 &&
+        (tx < MARGIN || tx > cw - MARGIN || ty < MARGIN || ty > ch - MARGIN)
+      );
+      tx = Math.max(MARGIN, Math.min(cw - MARGIN, tx));
+      ty = Math.max(MARGIN, Math.min(ch - MARGIN, ty));
+
+      // Store for setupSwipeWord to reuse
+      word._swipePreTx = tx;
+      word._swipePreTy = ty;
+      word._swipePreOx = ox;
+      word._swipePreOy = oy;
+      word._swipePreCw = cw;
+      word._swipePreCh = ch;
+
+      // Ghost line SVG — fades in over GHOST_LEAD duration
+      const gSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      gSvg.classList.add('ghost-swipe-trail');
+      gSvg.style.left = '0';
+      gSvg.style.top = '0';
+      gSvg.style.width = `${cw}px`;
+      gSvg.style.height = `${ch}px`;
+      gSvg.style.setProperty('--ghost-line-duration', `${GHOST_LEAD}s`);
+      const gLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      gLine.setAttribute('x1', ox);
+      gLine.setAttribute('y1', oy);
+      gLine.setAttribute('x2', tx);
+      gLine.setAttribute('y2', ty);
+      gLine.setAttribute('stroke', wordColor);
+      gLine.setAttribute('stroke-width', '3');
+      gLine.setAttribute('stroke-dasharray', '8 6');
+      gLine.setAttribute('opacity', '0.3');
+      gSvg.appendChild(gLine);
+      container.appendChild(gSvg);
+      word._ghostLineSvg = gSvg;
+
+      // Ghost target dot — also fades in
+      const gDot = document.createElement('div');
+      gDot.className = 'swipe-target-dot';
+      gDot.style.left = `${tx}px`;
+      gDot.style.top = `${ty}px`;
+      gDot.style.borderColor = wordColor;
+      gDot.style.opacity = '0';
+      gDot.style.animation = 'none';
+      gDot.style.transition = `opacity ${GHOST_LEAD}s linear`;
+      container.appendChild(gDot);
+      word._ghostDotEl = gDot;
+      requestAnimationFrame(() => { gDot.style.opacity = '0.4'; });
+    }
+
     // Animate: grow from large to word-size over GHOST_LEAD seconds
-    // Ghost starts big and shrinks to normal
     el.style.setProperty('--ghost-duration', `${GHOST_LEAD}s`);
     requestAnimationFrame(() => {
       el.classList.add('ghost-animate');
@@ -389,8 +468,22 @@ const Game = (() => {
     const ghostId = `ghost-${idx}`;
     if (!activeWords.has(ghostId)) return;
 
+    // Sequential enforcement: miss any skipped word before this ghost
+    if (idx > 0 && idx > lastHitIdx + 1) {
+      for (const [wid, entry] of activeWords) {
+        const entryIdx = parseInt(entry.el.dataset.wordIdx ?? '-1', 10);
+        if (entryIdx >= 0 && entryIdx < idx && entryIdx > lastHitIdx && wid !== ghostId) {
+          handleMiss(wid, entry.word);
+          break;
+        }
+      }
+    }
+
+    if (!activeWords.has(ghostId)) return;
     activeWords.delete(ghostId);
     word._ghostClicked = true;
+    if (word._ghostLineSvg) { word._ghostLineSvg.remove(); word._ghostLineSvg = null; }
+    if (word._ghostDotEl)  { word._ghostDotEl.remove();  word._ghostDotEl  = null; }
 
     const wordBegin = parseFloat(el.dataset.wordBegin);
     const now = getCurrentTime();
@@ -401,6 +494,7 @@ const Game = (() => {
       if (delta <= w.maxDelta) { timing = w; break; }
     }
 
+    lastHitIdx = Math.max(lastHitIdx, idx);
     score++;
     combo++;
     onScoreUpdate({ score, combo, missCount });
@@ -424,32 +518,45 @@ const Game = (() => {
       return;
     }
 
-    // Remove ghost (not yet clicked)
+    // Ghost snap-out: let it finish at scale(1) then flash out as main word appears
     const ghostEl = document.getElementById(`ghost-${idx}`);
     if (ghostEl) {
       activeWords.delete(`ghost-${idx}`);
-      ghostEl.remove();
+      ghostEl.classList.remove('ghost-animate');
+      ghostEl.classList.add('ghost-snap');
+      setTimeout(() => ghostEl.remove(), 90);
     }
+    // Remove ghost line & ghost dot (real ones will be added by setupSwipeWord)
+    if (word._ghostLineSvg) { word._ghostLineSvg.remove(); word._ghostLineSvg = null; }
+    if (word._ghostDotEl)  { word._ghostDotEl.remove();  word._ghostDotEl  = null; }
 
     const id = `word-${wordIdCounter++}`;
     const el = document.createElement('div');
-    el.className = 'game-word main-word';
     el.id = id;
     el.textContent = word.text;
-    el.style.left = `${word._px ?? (8 + Math.random() * 84)}%`;
-    el.style.top = `${word._py ?? (10 + Math.random() * 80)}%`;
+
+    const pxRaw = word._px ?? (8 + Math.random() * 84);
+    const pyRaw = word._py ?? (10 + Math.random() * 80);
+    el.style.left = `${pxRaw}%`;
+    el.style.top = `${pyRaw}%`;
     el.style.color = wordColor;
     el.style.borderColor = wordColor;
     el.style.setProperty('--word-color', wordColor);
     el.dataset.spawnTime = String(getCurrentTime());
     el.dataset.wordBegin = String(word.begin);
+    el.dataset.wordIdx = String(idx);
 
-    // Click handler
-    el.addEventListener('click', () => handleWordClick(el, word));
-    el.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      handleWordClick(el, word);
-    }, { passive: false });
+    if (word._isSwipe) {
+      el.className = 'game-word main-word swipe-word';
+      setupSwipeWord(el, word, id, pxRaw, pyRaw, container);
+    } else {
+      el.className = 'game-word main-word';
+      el.addEventListener('click', () => handleWordClick(el, word));
+      el.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        handleWordClick(el, word);
+      }, { passive: false });
+    }
 
     container.appendChild(el);
     activeWords.set(id, { el, word });
@@ -462,24 +569,212 @@ const Game = (() => {
     }, WORD_LINGER * 1000);
   }
 
+  // ── Swipe Setup ───────────────────────────────────────────
+  function setupSwipeWord(el, word, id, pxRaw, pyRaw, container) {
+    const cw = container.offsetWidth  || window.innerWidth;
+    const ch = container.offsetHeight || window.innerHeight;
+    const BOX = 110; // must match CSS .game-word width/height
+
+    // Origin in px
+    const ox = (pxRaw / 100) * cw;
+    const oy = (pyRaw / 100) * ch;
+
+    // Reuse pre-calculated target from ghost phase (same direction as ghost line)
+    const MARGIN = BOX / 2 + 10;
+    let tx, ty;
+    if (word._swipePreTx !== undefined) {
+      tx = word._swipePreTx;
+      ty = word._swipePreTy;
+    } else {
+      const minDist = SWIPE_PX_PER_SEC * SWIPE_MIN_GAP;
+      const maxDist = SWIPE_PX_PER_SEC * SWIPE_MAX_GAP;
+      const dist = minDist + Math.random() * (maxDist - minDist);
+      let angle, tries2 = 0;
+      do {
+        angle = Math.random() * 2 * Math.PI;
+        tx = ox + Math.cos(angle) * dist;
+        ty = oy + Math.sin(angle) * dist;
+        tries2++;
+      } while (
+        tries2 < 40 &&
+        (tx < MARGIN || tx > cw - MARGIN || ty < MARGIN || ty > ch - MARGIN)
+      );
+      tx = Math.max(MARGIN, Math.min(cw - MARGIN, tx));
+      ty = Math.max(MARGIN, Math.min(ch - MARGIN, ty));
+    }
+
+    // Draw dashed trail SVG
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.classList.add('swipe-trail');
+    svg.style.left = '0';
+    svg.style.top = '0';
+    svg.style.width = `${cw}px`;
+    svg.style.height = `${ch}px`;
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', ox);
+    line.setAttribute('y1', oy);
+    line.setAttribute('x2', tx);
+    line.setAttribute('y2', ty);
+    line.setAttribute('stroke', wordColor);
+    line.setAttribute('stroke-width', '3');
+    line.setAttribute('stroke-dasharray', '8 6');
+    line.setAttribute('opacity', '0.45');
+    svg.appendChild(line);
+    container.appendChild(svg);
+
+    // Target dot
+    const dot = document.createElement('div');
+    dot.className = 'swipe-target-dot';
+    dot.style.left = `${tx}px`;
+    dot.style.top = `${ty}px`;
+    dot.style.borderColor = wordColor;
+    container.appendChild(dot);
+
+    // Store refs for cleanup
+    el._swipeTrailSvg = svg;
+    el._swipeTargetDot = dot;
+    el._swipeTx = tx;
+    el._swipeTy = ty;
+    el._swipeOx = ox;
+    el._swipeOy = oy;
+    el._swipeDone = false;
+
+    // ── Drag logic ──
+    let dragging = false;
+    let startX, startY;
+
+    function getEventXY(e) {
+      if (e.touches) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      return { x: e.clientX, y: e.clientY };
+    }
+
+    function onDragStart(e) {
+      if (el._swipeDone || !activeWords.has(id)) return;
+      e.preventDefault();
+      dragging = true;
+      const { x, y } = getEventXY(e);
+      const rect = container.getBoundingClientRect();
+      startX = x - rect.left;
+      startY = y - rect.top;
+    }
+
+    function onDragMove(e) {
+      if (!dragging || el._swipeDone) return;
+      e.preventDefault();
+      const { x, y } = getEventXY(e);
+      const rect = container.getBoundingClientRect();
+      let cx2 = x - rect.left;
+      let cy2 = y - rect.top;
+
+      // Project onto the allowed line (ox→tx, oy→ty)
+      const dx = tx - ox, dy = ty - oy;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      const ux = dx / len, uy = dy / len;
+      const dot2 = (cx2 - ox) * ux + (cy2 - oy) * uy;
+      const clamped = Math.max(0, Math.min(len, dot2));
+
+      const nx = ox + ux * clamped;
+      const ny = oy + uy * clamped;
+
+      el.style.left = `${(nx / cw) * 100}%`;
+      el.style.top  = `${(ny / ch) * 100}%`;
+
+      // Check if reached target (within 28px)
+      if (clamped >= len - 28) {
+        el._swipeDone = true;
+        dragging = false;
+        cleanupSwipeListeners();
+        handleSwipeComplete(el, word, id, container);
+      }
+    }
+
+    function onDragEnd(e) {
+      dragging = false;
+    }
+
+    function cleanupSwipeListeners() {
+      el.removeEventListener('mousedown', onDragStart);
+      el.removeEventListener('touchstart', onDragStart);
+      window.removeEventListener('mousemove', onDragMove);
+      window.removeEventListener('touchmove', onDragMove);
+      window.removeEventListener('mouseup', onDragEnd);
+      window.removeEventListener('touchend', onDragEnd);
+    }
+
+    el.addEventListener('mousedown', onDragStart);
+    el.addEventListener('touchstart', onDragStart, { passive: false });
+    window.addEventListener('mousemove', onDragMove, { passive: false });
+    window.addEventListener('touchmove', onDragMove, { passive: false });
+    window.addEventListener('mouseup', onDragEnd);
+    window.addEventListener('touchend', onDragEnd);
+
+    el._cleanupSwipe = cleanupSwipeListeners;
+  }
+
+  // ── Swipe Complete ────────────────────────────────────────
+  function handleSwipeComplete(el, word, id, container) {
+    if (!activeWords.has(id)) return;
+    activeWords.delete(id);
+
+    // Remove trail & dot
+    el._swipeTrailSvg?.remove();
+    el._swipeTargetDot?.remove();
+    if (el._cleanupSwipe) el._cleanupSwipe();
+
+    const completedIdx = parseInt(el.dataset.wordIdx ?? '-1', 10);
+    const wordEnd = word.end ?? (word.begin + 0.5);
+    const now = getCurrentTime();
+    // Delta: absolute distance from wordEnd — closer = better rating
+    // Kéo đúng lúc wordEnd → delta ≈ 0 → PERFECT
+    const delta = Math.abs(now - wordEnd);
+
+    let timing = TIMING_WINDOWS[TIMING_WINDOWS.length - 1];
+    for (const w of TIMING_WINDOWS) {
+      if (delta <= w.maxDelta) { timing = w; break; }
+    }
+
+    lastHitIdx = Math.max(lastHitIdx, completedIdx);
+    score++;
+    combo++;
+    onScoreUpdate({ score, combo, missCount });
+    onWordHit({ label: timing.label, color: timing.color, x: el.style.left, y: el.style.top });
+
+    el.classList.add('hit-flash');
+    setTimeout(() => el.remove(), 300);
+  }
+
   // ── Click Handler ─────────────────────────────────────────
   function handleWordClick(el, word) {
     const id = el.id;
     if (!activeWords.has(id)) return;
 
+    const clickedIdx = parseInt(el.dataset.wordIdx ?? '-1', 10);
+
+    // Sequential enforcement: if a word before this one is still active, miss it first
+    if (clickedIdx > 0 && clickedIdx > lastHitIdx + 1) {
+      // Find any active word with idx between lastHitIdx+1 and clickedIdx-1
+      for (const [wid, entry] of activeWords) {
+        const entryIdx = parseInt(entry.el.dataset.wordIdx ?? '-1', 10);
+        if (entryIdx >= 0 && entryIdx < clickedIdx && entryIdx > lastHitIdx && wid !== id) {
+          handleMiss(wid, entry.word);
+          break;
+        }
+      }
+    }
+
+    if (!activeWords.has(id)) return; // may have been removed by miss cascade
     activeWords.delete(id);
 
-    const spawnTime = parseFloat(el.dataset.spawnTime);
     const wordBegin = parseFloat(el.dataset.wordBegin);
     const now = getCurrentTime();
     const delta = Math.abs(now - wordBegin);
 
-    // Find timing window
     let window = TIMING_WINDOWS[TIMING_WINDOWS.length - 1];
     for (const w of TIMING_WINDOWS) {
       if (delta <= w.maxDelta) { window = w; break; }
     }
 
+    lastHitIdx = Math.max(lastHitIdx, clickedIdx);
     score++;
     combo++;
     onScoreUpdate({ score, combo, missCount });
@@ -502,6 +797,9 @@ const Game = (() => {
     onMiss({ word: word.text, x: el.style.left, y: el.style.top });
     onScoreUpdate({ score, combo, missCount });
 
+    el._swipeTrailSvg?.remove();
+    el._swipeTargetDot?.remove();
+    if (el._cleanupSwipe) el._cleanupSwipe();
     el.classList.add('miss-flash');
     setTimeout(() => el.remove(), 500);
   }
@@ -524,6 +822,24 @@ const Game = (() => {
     endGame();
   }
 
+  function pauseGame() {
+    if (!isPlaying || isPaused) return;
+    isPaused = true;
+    pausedAt = audioContext.currentTime;
+    audioContext.suspend();
+    clearTimeout(scheduleTimer);
+  }
+
+  function resumeGame() {
+    if (!isPaused) return;
+    isPaused = false;
+    // Recalculate audioStartTime to account for paused duration
+    const pausedDuration = audioContext.currentTime - pausedAt;
+    audioStartTime += pausedDuration;
+    audioContext.resume();
+    scheduleWords();
+  }
+
   // ── Word color setter ─────────────────────────────────────
   function setWordColor(c) {
     wordColor = c;
@@ -536,6 +852,8 @@ const Game = (() => {
     validateFiles,
     startGame,
     stopGame,
+    pauseGame,
+    resumeGame,
     setCallbacks,
     setWordColor,
     getCurrentTime: () => getCurrentTime(),
