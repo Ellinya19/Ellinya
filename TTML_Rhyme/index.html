@@ -621,7 +621,6 @@ header {
         <div class="info-tab-content active" data-tab="how-to" id="content-howto">
           <p id="info-p1">Upload an audio file and its matching <b>.ttml</b> file, then press <b>START</b>.</p>
           <p id="info-p2">Words will appear at random positions on screen, timed to the lyrics. <b>Click them</b> before they disappear!</p>
-          <p id="info-p3">A <b>ghost</b> circle previews where each word will appear 2 seconds before it shows up — just like osu!</p>
           <p id="info-p4">Scoring: <b style="background:linear-gradient(90deg,#ff6b6b,#ffe97e,#7eff9c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">PERFECT</b> &lt;0.15s · <b style="color:#7ef2ff">GREAT</b> &lt;0.35s · <b style="color:#7eff9c">GOOD</b> &lt;0.55s · and more.</p>
         </div>
         <div class="info-tab-content" data-tab="create" id="content-create">
@@ -786,7 +785,6 @@ const T = {
     'tab-create': 'Tạo TTML',
     'info-p1': 'Tải lên tệp âm thanh và tệp <b>.ttml</b> tương ứng, sau đó nhấn <b>BẮT ĐẦU</b>.',
     'info-p2': 'Các từ sẽ xuất hiện ở vị trí ngẫu nhiên trên màn hình, theo thời gian lời bài hát. <b>Nhấn vào chúng</b> trước khi biến mất!',
-    'info-p3': '<b>Bóng ma</b> sẽ báo trước vị trí từ sẽ xuất hiện 2 giây trước — giống osu!',
     'info-p4': '<b style="background:linear-gradient(90deg,#ff6b6b,#ffe97e,#7eff9c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">PERFECT</b> &lt;0.15s · <b style="color:#7ef2ff">GREAT</b> &lt;0.35s · <b style="color:#7eff9c">GOOD</b> &lt;0.55s · và nhiều hơn.',
     'create-tool-name': 'Tạo TTML — Công Cụ Sync Từng Từ',
     'create-tool-desc': 'Dùng công cụ này để tạo tệp TTML có thời gian từng từ từ lời bài hát và âm thanh.',
@@ -807,7 +805,7 @@ function applyTranslations() {
   keys.forEach(key => {
     const el = document.getElementById(key);
     if (!el) return;
-    if (['info-p1','info-p2','info-p3','info-p4','create-tool-desc'].includes(key)) {
+    if (['info-p1','info-p2','info-p4','create-tool-desc'].includes(key)) {
       el.innerHTML = t(key);
     } else {
       el.textContent = t(key);
