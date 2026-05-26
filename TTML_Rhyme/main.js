@@ -19,6 +19,7 @@ const Game = (() => {
   let score = 0;
   let missCount = 0;
   let combo = 0;
+  let hitCounts = { PERFECT: 0, GREAT: 0, GOOD: 0, OK: 0, LATE: 0, BAD: 0 };
   let gameRunning = false;
   let gameStarted = false;
   let scheduleTimer = null;
@@ -183,8 +184,8 @@ const Game = (() => {
       return !conflicts;
     });
 
-    // Shift all word timings 200ms earlier to compensate audio latency
-    const TTML_OFFSET = 0.2;
+    // Shift all word timings earlier to compensate audio latency
+    const TTML_OFFSET = -0.4;
     filtered.forEach(w => {
       w.begin = Math.max(0, w.begin - TTML_OFFSET);
       if (w.end !== null) w.end = Math.max(0, w.end - TTML_OFFSET);
@@ -250,6 +251,7 @@ const Game = (() => {
     score = 0;
     missCount = 0;
     combo = 0;
+    hitCounts = { PERFECT: 0, GREAT: 0, GOOD: 0, OK: 0, LATE: 0, BAD: 0 };
     wordIdCounter = 0;
     lastHitIdx = -1;
     isPaused = false;
@@ -455,11 +457,13 @@ const Game = (() => {
     // Ghost is clickable — scored same as main word
     el.dataset.wordBegin = String(word.begin);
     el.dataset.spawnTime = String(getCurrentTime());
-    el.addEventListener('click', () => handleGhostClick(el, word, idx));
-    el.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      handleGhostClick(el, word, idx);
-    }, { passive: false });
+    if (!word._isSwipe) {
+      el.addEventListener('click', () => handleGhostClick(el, word, idx));
+      el.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        handleGhostClick(el, word, idx);
+      }, { passive: false });
+    }
 
     container.appendChild(el);
     activeWords.set(id, { el, word, isGhost: true });
@@ -746,6 +750,8 @@ const Game = (() => {
     // ── Drag logic ──
     let dragging = false;
     let startX, startY;
+    let dragMoved = false;
+    const DRAG_MIN_PX = 12; // phải kéo ít nhất 12px mới được tính là drag thật
 
     function getEventXY(e) {
       if (e.touches) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -756,6 +762,7 @@ const Game = (() => {
       if (el._swipeDone || !activeWords.has(id)) return;
       e.preventDefault();
       dragging = true;
+      dragMoved = false;
       const { x, y } = getEventXY(e);
       const rect = container.getBoundingClientRect();
       startX = x - rect.left;
@@ -771,6 +778,11 @@ const Game = (() => {
       const rect = container.getBoundingClientRect();
       const cx2 = x - rect.left;
       const cy2 = y - rect.top;
+      if (!dragMoved) {
+        const dx0 = cx2 - startX, dy0 = cy2 - startY;
+        if (Math.sqrt(dx0 * dx0 + dy0 * dy0) < DRAG_MIN_PX) return;
+        dragMoved = true;
+      }
 
       if (word._swipeUseArc) {
         const sweepDir = word._swipeSweepDir ?? 1;
@@ -865,7 +877,8 @@ const Game = (() => {
     lastHitIdx = Math.max(lastHitIdx, completedIdx);
     score++;
     combo++;
-    onScoreUpdate({ score, combo, missCount });
+    if (hitCounts.hasOwnProperty(timing.label)) hitCounts[timing.label]++;
+    onScoreUpdate({ score, combo, missCount, hitCounts });
     onWordHit({ label: timing.label, color: timing.color, x: el.style.left, y: el.style.top });
 
     el.classList.add('hit-flash');
@@ -879,15 +892,22 @@ const Game = (() => {
 
     const clickedIdx = parseInt(el.dataset.wordIdx ?? '-1', 10);
 
-    // Sequential enforcement: if a word before this one is still active, miss it first
+    // Sequential enforcement: miss ALL active words before this one
     if (clickedIdx > 0 && clickedIdx > lastHitIdx + 1) {
-      // Find any active word with idx between lastHitIdx+1 and clickedIdx-1
+      const toMiss = [];
       for (const [wid, entry] of activeWords) {
         const entryIdx = parseInt(entry.el.dataset.wordIdx ?? '-1', 10);
         if (entryIdx >= 0 && entryIdx < clickedIdx && entryIdx > lastHitIdx && wid !== id) {
-          handleMiss(wid, entry.word);
-          break;
+          toMiss.push({ wid, word: entry.word });
         }
+      }
+      toMiss.sort((a, b) => {
+        const ai = parseInt(activeWords.get(a.wid)?.el.dataset.wordIdx ?? '-1', 10);
+        const bi = parseInt(activeWords.get(b.wid)?.el.dataset.wordIdx ?? '-1', 10);
+        return ai - bi;
+      });
+      for (const { wid, word: w } of toMiss) {
+        handleMiss(wid, w);
       }
     }
 
@@ -906,7 +926,8 @@ const Game = (() => {
     lastHitIdx = Math.max(lastHitIdx, clickedIdx);
     score++;
     combo++;
-    onScoreUpdate({ score, combo, missCount });
+    if (hitCounts.hasOwnProperty(window.label)) hitCounts[window.label]++;
+    onScoreUpdate({ score, combo, missCount, hitCounts });
     onWordHit({ label: window.label, color: window.color, x: el.style.left, y: el.style.top });
 
     el.classList.add('hit-flash');
@@ -944,7 +965,7 @@ const Game = (() => {
     activeWords.forEach(({ el }) => el.remove());
     activeWords.clear();
 
-    onGameEnd({ score, missCount, total: words.length });
+    onGameEnd({ score, missCount, total: words.length, hitCounts });
   }
 
   function stopGame() {
@@ -986,6 +1007,466 @@ const Game = (() => {
     setCallbacks,
     setWordColor,
     getCurrentTime: () => getCurrentTime(),
-    getScore: () => ({ score, combo, missCount }),
+    getScore: () => ({ score, combo, missCount, hitCounts }),
+  };
+})();
+
+// ═══════════════════════════════════════════════════════════
+//  BEAT GAME — Click to the Beat mode
+//  Squares fly in from edges toward the center target square.
+//  Timing + scoring mirrors the Circle (Game) module.
+// ═══════════════════════════════════════════════════════════
+const BeatGame = (() => {
+  // ── State ────────────────────────────────────────────────
+  let audioBuffer = null;
+  let audioContext = null;
+  let audioSource = null;
+  let audioDuration = 0;
+  let audioStartTime = 0;
+  let audioOffsetTime = 0;
+  let isPlaying = false;
+  let isPaused = false;
+  let pausedAt = 0;
+
+  let words = [];
+  let activeSquares = new Map(); // id → { el, word, animFrame }
+  let score = 0;
+  let missCount = 0;
+  let combo = 0;
+  let hitCounts = { PERFECT: 0, GREAT: 0, GOOD: 0, OK: 0, LATE: 0, BAD: 0 };
+  let gameRunning = false;
+  let scheduleTimer = null;
+  let wordIdCounter = 0;
+  let wordColor = '#ffffff';
+  let lastHitIdx = -1;
+  let _fieldClickHandler = null;
+
+  // ── Constants ────────────────────────────────────────────
+  const BEAT_LEAD = 5.0;       // Square appears N seconds before word.begin
+  const WORD_LINGER = 2.1;     // After arrival: how long before auto-miss
+  const TIMING_WINDOWS = [
+    { label: 'PERFECT', maxDelta: 0.15, color: 'rainbow' },
+    { label: 'GREAT',   maxDelta: 0.35, color: '#7ef2ff' },
+    { label: 'GOOD',    maxDelta: 0.55, color: '#7eff9c' },
+    { label: 'OK',      maxDelta: 0.75, color: '#ffe97e' },
+    { label: 'LATE',    maxDelta: 1.00, color: '#ff9f7e' },
+    { label: 'BAD',     maxDelta: Infinity, color: '#ff6e6e' },
+  ];
+
+  // ── Callbacks ─────────────────────────────────────────────
+  let onScoreUpdate = () => {};
+  let onMiss        = () => {};
+  let onGameEnd     = () => {};
+  let onCountdown   = () => {};
+  let onWaiting     = () => {};
+  let onWordHit     = () => {};
+
+  function setCallbacks(cb) {
+    onScoreUpdate = cb.onScoreUpdate || onScoreUpdate;
+    onMiss        = cb.onMiss        || onMiss;
+    onGameEnd     = cb.onGameEnd     || onGameEnd;
+    onCountdown   = cb.onCountdown   || onCountdown;
+    onWaiting     = cb.onWaiting     || onWaiting;
+    onWordHit     = cb.onWordHit     || onWordHit;
+  }
+
+  function setWordColor(c) { wordColor = c; }
+
+  // ── Audio helpers (reuse Game's already-decoded buffer) ───
+  function getCurrentTime() {
+    if (!isPlaying || !audioContext) return audioOffsetTime;
+    if (isPaused) return audioOffsetTime + (pausedAt - audioStartTime);
+    return audioOffsetTime + (audioContext.currentTime - audioStartTime);
+  }
+
+  // ── Start ─────────────────────────────────────────────────
+  async function startGame(ttmlWords, color) {
+    document.body.classList.add('beat-mode');
+    wordColor = color || '#ffffff';
+    words = ttmlWords;
+    words.forEach(w => { w._beatScheduled = false; w._beatClicked = false; });
+    score = 0; missCount = 0; combo = 0;
+    hitCounts = { PERFECT: 0, GREAT: 0, GOOD: 0, OK: 0, LATE: 0, BAD: 0 };
+    wordIdCounter = 0; lastHitIdx = -1;
+    isPaused = false;
+    gameRunning = true;
+    activeSquares.clear();
+
+    // Suppress Game's own scoring/visual callbacks — BeatGame owns those
+    Game.setCallbacks({
+      onScoreUpdate: () => {},
+      onMiss:        () => {},
+      onGameEnd:     () => {},
+      onCountdown:   () => {},
+      onWaiting:     () => {},
+      onWordHit:     () => {},
+    });
+
+    // Hide the target square until countdown finishes (req 2)
+    const targetSq = document.getElementById('beat-target-square');
+    if (targetSq) targetSq.style.display = 'none';
+
+    const firstWordTime = words[0]?.begin ?? 0;
+
+    // Mirror Game's waiting/countdown logic, using BEAT_LEAD instead of GHOST_LEAD
+    // A square needs BEAT_LEAD seconds to travel, so countdown ends at (firstWordTime - BEAT_LEAD)
+    // Countdown is 3s, so it starts at (firstWordTime - BEAT_LEAD - 3)
+    if (firstWordTime < BEAT_LEAD + 3) {
+      // Not enough lead time — countdown immediately, then start audio
+      await _beatDoCountdown(3);
+      if (targetSq) targetSq.style.display = '';
+      await _beatBeginPlayback(0);
+    } else {
+      // Enough lead — start audio right away, show waiting message, then countdown
+      await _beatBeginPlayback(0);
+      onWaiting(firstWordTime);
+
+      const countdownAt = firstWordTime - BEAT_LEAD - 3;
+      setTimeout(async () => {
+        const wm = document.getElementById('waiting-msg');
+        if (wm) wm.classList.remove('visible');
+        await _beatDoCountdown(3);
+        if (targetSq) targetSq.style.display = '';
+      }, Math.max(0, countdownAt * 1000));
+    }
+
+    // Schedule beat squares
+    scheduleBeatWords();
+
+    // Global click anywhere on game-field = hit the next hittable square in TTML order
+    const field = document.getElementById('game-field');
+    if (field) {
+      function onFieldClick(e) {
+        if (!gameRunning) return;
+        // Only hit squares that have arrived at the center (hittable)
+        let best = null, bestIdx = Infinity;
+        for (const [sid, entry] of activeSquares) {
+          if (!entry.el.classList.contains('hittable')) continue;
+          const eidx = parseInt(entry.el.dataset.wordIdx ?? '-1', 10);
+          if (eidx < bestIdx) { bestIdx = eidx; best = { id: sid, el: entry.el, word: entry.word, idx: eidx }; }
+        }
+        if (best) {
+          e.preventDefault();
+          e.stopPropagation();
+          handleBeatClick(best.id, best.el, best.word, best.idx);
+        }
+      }
+      _fieldClickHandler = onFieldClick;
+      field.addEventListener('click', onFieldClick);
+      field.addEventListener('touchstart', onFieldClick, { passive: false });
+    }
+  }
+
+  // ── Beat countdown (mirrors Game's doCountdown) ───────────
+  function _beatDoCountdown(n) {
+    return new Promise(resolve => {
+      let count = n;
+      const tick = () => {
+        onCountdown(count);
+        if (count <= 0) { resolve(); return; }
+        count--;
+        setTimeout(tick, 1000);
+      };
+      tick();
+    });
+  }
+
+  // ── Beat begin playback (delegates audio to Game's engine) ─
+  async function _beatBeginPlayback(offset) {
+    // Game.startGame with empty words = audio-only; BeatGame schedules its own visuals
+    await Game.startGame([], wordColor);
+    isPlaying = true;
+    isPaused = false;
+  }
+
+  // ── Word Scheduling ───────────────────────────────────────
+  function scheduleBeatWords() {
+    if (!gameRunning) return;
+
+    const now = Game.getCurrentTime(); // sync with Game's audio clock
+    const LOOKAHEAD = 0.5;
+
+    words.forEach((word, idx) => {
+      if (word._beatScheduled) return;
+      const spawnTime = word.begin - BEAT_LEAD;
+      if (spawnTime <= now + LOOKAHEAD) {
+        word._beatScheduled = true;
+        const delay = Math.max(0, (spawnTime - now) * 1000);
+        setTimeout(() => {
+          if (!gameRunning) return;
+          spawnBeatSquare(word, idx);
+        }, delay);
+      }
+    });
+
+    // Check end condition
+    const allScheduled = words.every(w => w._beatScheduled);
+    if (allScheduled && activeSquares.size === 0) {
+      const lastWord = words[words.length - 1];
+      if (lastWord && Game.getCurrentTime() > lastWord.begin + WORD_LINGER + 0.5) {
+        endGame();
+        return;
+      }
+    }
+
+    scheduleTimer = setTimeout(scheduleBeatWords, 200);
+  }
+
+  // ── Spawn Beat Square ─────────────────────────────────────
+  function spawnBeatSquare(word, idx) {
+    const container = document.getElementById('game-field');
+    if (!container) return;
+
+    const cw = container.offsetWidth  || window.innerWidth;
+    const ch = container.offsetHeight || window.innerHeight;
+
+    // Center target position (50%, 50%)
+    const tx = cw / 2;
+    const ty = ch / 2;
+
+    // Spawn from a random edge point
+    const { sx, sy } = randomEdgePoint(cw, ch);
+
+    const SQUARE_SIZE = 50;
+    const initialScale = 1.6 + Math.random() * 0.6; // start bigger
+    const initialRotation = Math.random() * 360;
+    const rotationSpeed = (Math.random() * 1.2 + 0.4) * (Math.random() < 0.5 ? 1 : -1); // deg/frame
+
+    const id = `beat-${wordIdCounter++}`;
+    const el = document.createElement('div');
+    el.id = id;
+    el.className = 'beat-square';
+    el.style.width  = `${SQUARE_SIZE}px`;
+    el.style.height = `${SQUARE_SIZE}px`;
+    el.style.background = wordColor;
+    el.style.opacity = '0.85';
+    el.style.left = `${sx - SQUARE_SIZE / 2}px`;
+    el.style.top  = `${sy - SQUARE_SIZE / 2}px`;
+    el.style.transform = `scale(${initialScale}) rotate(${initialRotation}deg)`;
+    el.dataset.wordBegin = String(word.begin);
+    el.dataset.wordIdx   = String(idx);
+    el.dataset.spawnTime = String(Game.getCurrentTime());
+
+    container.appendChild(el);
+
+    // Animation state — dùng thời gian tuyệt đối từ audio clock để đảm bảo
+    // square luôn đến đúng tâm target tại word.begin, bất kể setTimeout drift
+    const arrivalTime    = word.begin;
+    const spawnTime      = arrivalTime - BEAT_LEAD; // thời điểm lý thuyết square xuất hiện
+    const travelDuration = BEAT_LEAD;               // luôn đúng 5s, không phụ thuộc lag gọi hàm
+
+    let rotation = initialRotation;
+    let animFrameId;
+    let arrived = false;
+    let hittable = false;
+
+    // TARGET_HALF: radius of target square (226px / 2) + 19px hitbox padding (~5mm)
+    const TARGET_HALF = 132;
+
+    function animate() {
+      if (!gameRunning || isPaused) { animFrameId = requestAnimationFrame(animate); return; }
+
+      const now = Game.getCurrentTime();
+      const elapsed = now - spawnTime;
+      const rawT = travelDuration > 0 ? elapsed / travelDuration : 1;
+      const t = Math.min(rawT, 1);
+
+      // Ease: slow start → fast arrival (ease-in cubic)
+      const eased = t * t * t;
+
+      // Position
+      const cx = sx + (tx - sx) * eased;
+      const cy = sy + (ty - sy) * eased;
+      el.style.left = `${cx - SQUARE_SIZE / 2}px`;
+      el.style.top  = `${cy - SQUARE_SIZE / 2}px`;
+
+      // Scale: shrink from initialScale to 1 as it approaches, also ease-in
+      const scale = initialScale + (1 - initialScale) * eased;
+
+      // Rotation: slow at start, faster near arrival (same easing)
+      rotation += rotationSpeed * (0.3 + 0.7 * eased);
+      el.style.transform = `scale(${scale}) rotate(${rotation}deg)`;
+
+      // Check if square center is inside target boundary
+      const distX = Math.abs(cx - tx);
+      const distY = Math.abs(cy - ty);
+      const insideTarget = distX <= TARGET_HALF && distY <= TARGET_HALF;
+
+      if (insideTarget && !hittable) {
+        // Square entered target zone — now hittable
+        hittable = true;
+        el.classList.add('hittable');
+        el.style.transition = 'box-shadow 0.1s';
+        el.style.boxShadow = `0 0 18px ${wordColor}, 0 0 36px color-mix(in srgb, ${wordColor} 50%, transparent)`;
+      }
+
+      if (t < 1) {
+        animFrameId = requestAnimationFrame(animate);
+      } else {
+        // Arrived at exact center → auto-miss immediately
+        if (!arrived) {
+          arrived = true;
+          if (activeSquares.has(id)) handleBeatMiss(id, word);
+        }
+      }
+    }
+
+    animFrameId = requestAnimationFrame(animate);
+
+    activeSquares.set(id, { el, word, animFrameId: () => animFrameId, idx });
+
+    // No click listener on the square itself — handled globally on game-field (requirement 1)
+  }
+
+  // ── Random edge point ─────────────────────────────────────
+  function randomEdgePoint(cw, ch) {
+    const edge = Math.floor(Math.random() * 4);
+    const MARGIN = 60;
+    switch (edge) {
+      case 0: return { sx: MARGIN + Math.random() * (cw - MARGIN * 2), sy: -30 };        // top
+      case 1: return { sx: cw + 30, sy: MARGIN + Math.random() * (ch - MARGIN * 2) };   // right
+      case 2: return { sx: MARGIN + Math.random() * (cw - MARGIN * 2), sy: ch + 30 };   // bottom
+      default: return { sx: -30, sy: MARGIN + Math.random() * (ch - MARGIN * 2) };      // left
+    }
+  }
+
+  // ── Beat Click ────────────────────────────────────────────
+  function handleBeatClick(id, el, word, idx) {
+    if (!activeSquares.has(id)) return;
+
+    const clickedIdx = parseInt(el.dataset.wordIdx ?? '-1', 10);
+
+    // Sequential enforcement
+    if (clickedIdx > 0 && clickedIdx > lastHitIdx + 1) {
+      const toMiss = [];
+      for (const [wid, entry] of activeSquares) {
+        const entryIdx = parseInt(entry.el.dataset.wordIdx ?? '-1', 10);
+        if (entryIdx >= 0 && entryIdx < clickedIdx && entryIdx > lastHitIdx && wid !== id) {
+          toMiss.push({ wid, word: entry.word });
+        }
+      }
+      toMiss.sort((a, b) => {
+        return parseInt(activeSquares.get(a.wid)?.el.dataset.wordIdx ?? '-1', 10) -
+               parseInt(activeSquares.get(b.wid)?.el.dataset.wordIdx ?? '-1', 10);
+      });
+      for (const { wid, word: w } of toMiss) handleBeatMiss(wid, w);
+    }
+
+    if (!activeSquares.has(id)) return;
+
+    const entry = activeSquares.get(id);
+    cancelAnimationFrame(entry.animFrameId());
+    activeSquares.delete(id);
+
+    const wordBegin = parseFloat(el.dataset.wordBegin);
+    const now = Game.getCurrentTime();
+    const delta = Math.abs(now - wordBegin);
+
+    let timing = TIMING_WINDOWS[TIMING_WINDOWS.length - 1];
+    for (const w of TIMING_WINDOWS) {
+      if (delta <= w.maxDelta) { timing = w; break; }
+    }
+
+    lastHitIdx = Math.max(lastHitIdx, clickedIdx);
+    score++;
+    combo++;
+    if (hitCounts.hasOwnProperty(timing.label)) hitCounts[timing.label]++;
+    onScoreUpdate({ score, combo, missCount, hitCounts });
+
+    const container = document.getElementById('game-field');
+    const cw = container?.offsetWidth || window.innerWidth;
+    const ch = container?.offsetHeight || window.innerHeight;
+    onWordHit({ label: timing.label, color: timing.color, x: `${cw / 2}px`, y: `${ch / 2}px` });
+
+    // Hit flash: scale up + fade
+    el.style.transition = 'transform 0.25s ease, opacity 0.25s ease';
+    el.style.transform = 'scale(1.5)';
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 280);
+  }
+
+  // ── Beat Miss ─────────────────────────────────────────────
+  function handleBeatMiss(id, word) {
+    const entry = activeSquares.get(id);
+    if (!entry) return;
+
+    cancelAnimationFrame(entry.animFrameId());
+    activeSquares.delete(id);
+    combo = 0;
+    missCount++;
+
+    const { el } = entry;
+    const container = document.getElementById('game-field');
+    const cw = container?.offsetWidth || window.innerWidth;
+    const ch = container?.offsetHeight || window.innerHeight;
+    onMiss({ word: word.text, x: `${cw / 2}px`, y: `${ch / 2}px` });
+    onScoreUpdate({ score, combo, missCount });
+
+    el.style.transition = 'transform 0.4s ease, opacity 0.4s ease, background 0.1s';
+    el.style.background = '#ff4444';
+    el.style.opacity = '0';
+    el.style.transform = 'scale(0.5)';
+    setTimeout(() => el.remove(), 420);
+  }
+
+  // ── End Game ──────────────────────────────────────────────
+  function endGame() {
+    gameRunning = false;
+    clearTimeout(scheduleTimer);
+    activeSquares.forEach(entry => {
+      cancelAnimationFrame(entry.animFrameId());
+      entry.el.remove();
+    });
+    activeSquares.clear();
+    onGameEnd({ score, missCount, total: words.length, hitCounts });
+  }
+
+  function stopGame() {
+    document.body.classList.remove('beat-mode');
+    endGame();
+    Game.stopGame();
+    const field = document.getElementById('game-field');
+    if (field && _fieldClickHandler) {
+      field.removeEventListener('click', _fieldClickHandler);
+      field.removeEventListener('touchstart', _fieldClickHandler);
+      _fieldClickHandler = null;
+    }
+  }
+
+  function pauseGame() {
+    if (isPaused) return;
+    isPaused = true;
+    Game.pauseGame();
+  }
+
+  function resumeGame() {
+    if (!isPaused) return;
+    isPaused = false;
+    Game.resumeGame();
+  }
+
+  // ── Space bar global handler (hit most recent arrived square) ──
+  // Registered once; checks _selectedMode via closure not needed — always tries BeatGame
+  document.addEventListener('keydown', (e) => {
+    if (e.code !== 'Space' || !gameRunning) return;
+    e.preventDefault();
+    // Only hit squares that have arrived (hittable)
+    let best = null, bestIdx = Infinity;
+    for (const [id, entry] of activeSquares) {
+      if (!entry.el.classList.contains('hittable')) continue;
+      const idx = parseInt(entry.el.dataset.wordIdx ?? '-1', 10);
+      if (idx < bestIdx) { bestIdx = idx; best = { id, el: entry.el, word: entry.word, idx }; }
+    }
+    if (best) handleBeatClick(best.id, best.el, best.word, best.idx);
+  });
+
+  // ── Expose API ────────────────────────────────────────────
+  return {
+    startGame,
+    stopGame,
+    pauseGame,
+    resumeGame,
+    setCallbacks,
+    setWordColor,
   };
 })();

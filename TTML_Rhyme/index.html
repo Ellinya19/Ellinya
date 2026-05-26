@@ -17,7 +17,7 @@
   --text: #f0f0f0;
   --muted: #666666;
   --active-glow: 0 0 30px rgba(220,220,220,0.3);
-  --word-color: #ffffff;
+  --object-color: #ffffff;
 }
 
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -312,6 +312,48 @@ header {
 .hud-miss{color:#ff6e6e;}
 .hud-miss b{color:#ff6e6e !important;}
 #stopBtn{margin-left:auto;padding:6px 16px;font-size:10px;}
+#hud-hit-counts {
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+.hud-hit-item {
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10px;
+  letter-spacing:1px;
+  color:var(--muted);
+}
+.hud-hit-item b { font-size:13px; }
+.last-result-box {
+  border:1px solid var(--border);
+  padding:16px 20px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  width:100%;
+  max-width:480px;
+}
+.last-result-title {
+  font-family:'IBM Plex Mono',monospace;
+  font-size:9px;
+  letter-spacing:3px;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.last-result-stats {
+  display:flex;
+  flex-wrap:wrap;
+  gap:14px;
+}
+.last-result-item {
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10px;
+  letter-spacing:1px;
+  color:var(--muted);
+}
+.last-result-item b { color:var(--accent); font-size:13px; }
+.last-result-item.miss b { color:#ff6e6e; }
 
 /* Game field */
 #game-field {
@@ -639,6 +681,135 @@ header {
 .pause-actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
 #pauseBtn{margin-left:auto;padding:6px 16px;font-size:10px;}
 
+/* ── Game Mode Popup ── */
+#mode-popup-overlay {
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.75);
+  align-items:center;
+  justify-content:center;
+  z-index:5000;
+  backdrop-filter:blur(6px);
+}
+#mode-popup-overlay.active{display:flex;}
+.mode-popup-box {
+  background:var(--surface);
+  border:1px solid var(--border);
+  padding:40px 48px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:28px;
+  min-width:340px;
+  max-width:520px;
+  width:90vw;
+}
+.mode-popup-title {
+  font-family:'Lexend',sans-serif;
+  font-size:18px;
+  letter-spacing:4px;
+  color:var(--accent);
+  text-align:center;
+}
+.mode-popup-subtitle {
+  font-family:'IBM Plex Mono',monospace;
+  font-size:9px;
+  letter-spacing:2px;
+  color:var(--muted);
+  text-align:center;
+  margin-top:-18px;
+}
+.mode-list {
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  width:100%;
+}
+.mode-card {
+  border:1px solid var(--border);
+  padding:18px 22px;
+  cursor:pointer;
+  transition:all 0.15s;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  background:transparent;
+  text-align:left;
+}
+.mode-card:hover {
+  border-color:var(--accent);
+  background:rgba(255,255,255,0.04);
+}
+.mode-card-name {
+  font-family:'Lexend',sans-serif;
+  font-size:14px;
+  letter-spacing:2px;
+  color:var(--accent);
+}
+.mode-card-desc {
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10px;
+  letter-spacing:1px;
+  color:var(--muted);
+  line-height:1.6;
+}
+.mode-popup-cancel {
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10px;
+  letter-spacing:2px;
+  color:var(--muted);
+  background:transparent;
+  border:none;
+  cursor:pointer;
+  padding:4px 8px;
+  transition:color 0.15s;
+}
+.mode-popup-cancel:hover{color:var(--accent);}
+
+/* ── Beat-click: center target square ── */
+#beat-target-square {
+  position:absolute;
+  top:50%;
+  left:50%;
+  width:226px;
+  height:226px;
+  transform:translate(-50%,-50%);
+  border:2px solid var(--word-color, #ffffff);
+  opacity:0.35;
+  background:transparent;
+  pointer-events:none;
+  z-index:6;
+}
+
+/* ── Beat-click: incoming square ── */
+.beat-square {
+  position:absolute;
+  width:50px;
+  height:50px;
+  pointer-events:none;
+  z-index:5;
+  will-change:transform,opacity,left,top;
+  border-radius:4px;
+  box-shadow:
+    inset -4px -4px 0px rgba(0,0,0,0.35),
+    inset 4px 4px 0px rgba(255,255,255,0.18),
+    4px 6px 16px rgba(0,0,0,0.6),
+    0 2px 4px rgba(0,0,0,0.4);
+  background-image:
+    linear-gradient(135deg, rgba(255,255,255,0.18) 0%, transparent 50%, rgba(0,0,0,0.2) 100%);
+}
+.beat-square.hittable {
+  pointer-events:none;
+  cursor:default;
+}
+
+/* Hide cursor in beat mode */
+body.beat-mode,
+body.beat-mode * {
+  cursor:none !important;
+}
+
 /* ── Swipe word ── */
 .swipe-word {
   cursor:grab;
@@ -693,7 +864,7 @@ header {
     <div class="color-picker-wrapper">
       <label class="color-label" for="wordColorInput" id="colorLabel">
         <span class="color-dot" id="colorDot"></span>
-        <span id="colorLabelText">WORD COLOR</span>
+        <span id="colorLabelText">OBJECT COLOR</span>
       </label>
       <input type="color" id="wordColorInput" value="#ffffff">
     </div>
@@ -717,7 +888,10 @@ header {
         </div>
         <div class="info-tab-content active" data-tab="how-to" id="content-howto">
           <p id="info-p1">Upload an audio file and its matching <b>.ttml</b> file, then press <b>START</b>.</p>
+          <p id="info-p-circle-title" style="font-weight:700;letter-spacing:1px;margin-bottom:2px;">🔵 Click the Circle</p>
           <p id="info-p2">Words will appear at random positions on screen, timed to the lyrics. <b>Click them</b> before they disappear!</p>
+          <p id="info-p-beat-title" style="font-weight:700;letter-spacing:1px;margin-bottom:2px;margin-top:6px;">🟦 Click to the Beat</p>
+          <p id="info-p-beat">When a square flies in from the edge toward the hollow square at the center, <b>click anywhere</b> or press <b>Space</b> before it disappears!</p>
           <p id="info-p4">Scoring: <b style="background:linear-gradient(90deg,#ff6b6b,#ffe97e,#7eff9c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">PERFECT</b> &lt;0.15s · <b style="color:#7ef2ff">GREAT</b> &lt;0.35s · <b style="color:#7eff9c">GOOD</b> &lt;0.55s · and more.</p>
         </div>
         <div class="info-tab-content" data-tab="create" id="content-create">
@@ -734,6 +908,10 @@ header {
 
 <!-- ── Upload Screen ── -->
 <div id="upload-screen">
+  <div id="last-result-box" class="last-result-box" style="display:none;">
+    <div class="last-result-title" id="last-result-title">LAST RESULT</div>
+    <div class="last-result-stats" id="last-result-stats"></div>
+  </div>
   <div class="upload-container">
     <div class="upload-title" id="ui-title">TTML RHYME</div>
     <div class="upload-subtitle" id="ui-subtitle">UPLOAD MUSIC &amp; LYRICS TO PLAY</div>
@@ -773,6 +951,14 @@ header {
     <div class="hud-item"><b id="hud-score">0</b> <span id="hud-score-label">pts</span></div>
     <div class="hud-item" id="hud-combo-wrap">✕<b id="hud-combo">0</b> <span id="hud-combo-label">combo</span></div>
     <div class="hud-item hud-miss">MISS: <b id="hud-miss">0</b></div>
+    <div id="hud-hit-counts">
+      <span class="hud-hit-item" style="color:transparent;background:linear-gradient(90deg,#ff6b6b,#ffe97e,#7eff9c);-webkit-background-clip:text;background-clip:text;">P:<b id="hud-perfect">0</b></span>
+      <span class="hud-hit-item" style="color:#7ef2ff;">GR:<b id="hud-great">0</b></span>
+      <span class="hud-hit-item" style="color:#7eff9c;">GD:<b id="hud-good">0</b></span>
+      <span class="hud-hit-item" style="color:#ffe97e;">OK:<b id="hud-ok">0</b></span>
+      <span class="hud-hit-item" style="color:#ff9f7e;">LT:<b id="hud-late">0</b></span>
+      <span class="hud-hit-item" style="color:#ff6e6e;">BD:<b id="hud-bad">0</b></span>
+    </div>
     <button class="btn" id="pauseBtn" onclick="onPauseClick()">PAUSE</button>
   </div>
 
@@ -812,11 +998,56 @@ header {
           <span class="end-stat-label" id="end-acc-label">ACCURACY</span>
         </div>
       </div>
+      <div class="end-stats" id="end-hit-stats" style="gap:20px;">
+        <div class="end-stat">
+          <span class="end-stat-num" id="end-perfect" style="background:linear-gradient(90deg,#ff6b6b,#ffe97e,#7eff9c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-size:clamp(20px,3vw,36px);">0</span>
+          <span class="end-stat-label">PERFECT</span>
+        </div>
+        <div class="end-stat">
+          <span class="end-stat-num" id="end-great" style="color:#7ef2ff;font-size:clamp(20px,3vw,36px);">0</span>
+          <span class="end-stat-label">GREAT</span>
+        </div>
+        <div class="end-stat">
+          <span class="end-stat-num" id="end-good" style="color:#7eff9c;font-size:clamp(20px,3vw,36px);">0</span>
+          <span class="end-stat-label">GOOD</span>
+        </div>
+        <div class="end-stat">
+          <span class="end-stat-num" id="end-ok" style="color:#ffe97e;font-size:clamp(20px,3vw,36px);">0</span>
+          <span class="end-stat-label">OK</span>
+        </div>
+        <div class="end-stat">
+          <span class="end-stat-num" id="end-late" style="color:#ff9f7e;font-size:clamp(20px,3vw,36px);">0</span>
+          <span class="end-stat-label">LATE</span>
+        </div>
+        <div class="end-stat">
+          <span class="end-stat-num" id="end-bad" style="color:#ff6e6e;font-size:clamp(20px,3vw,36px);">0</span>
+          <span class="end-stat-label">BAD</span>
+        </div>
+      </div>
       <div class="end-actions">
         <button class="btn primary" onclick="onPlayAgain()" id="btn-play-again">PLAY AGAIN</button>
         <button class="btn" style="color:#ffffff;border-color:rgba(255,255,255,0.3);" onclick="onBackToMenu()" id="btn-back">BACK TO MENU</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ── Game Mode Popup ── -->
+<div id="mode-popup-overlay">
+  <div class="mode-popup-box">
+    <div class="mode-popup-title" id="mode-popup-title">SELECT MODE</div>
+    <div class="mode-popup-subtitle" id="mode-popup-subtitle">CHOOSE YOUR GAME STYLE</div>
+    <div class="mode-list">
+      <button class="mode-card" onclick="onSelectMode('circle')" id="mode-card-circle">
+        <span class="mode-card-name" id="mode-name-circle">Click the Circle</span>
+        <span class="mode-card-desc" id="mode-desc-circle">Words appear as circles on screen. Click them in time with the lyrics!</span>
+      </button>
+      <button class="mode-card" onclick="onSelectMode('beat')" id="mode-card-beat">
+        <span class="mode-card-name" id="mode-name-beat">Click to the Beat</span>
+        <span class="mode-card-desc" id="mode-desc-beat">Squares fly in from the edges toward the center target. Click or press Space when they arrive!</span>
+      </button>
+    </div>
+    <button class="mode-popup-cancel" id="mode-popup-cancel" onclick="closeModePopup()">CANCEL</button>
   </div>
 </div>
 
@@ -898,11 +1129,14 @@ const T = {
     'end-acc-label': 'ACCURACY',
     'btn-play-again': 'PLAY AGAIN',
     'btn-back': 'BACK TO MENU',
-    'colorLabelText': 'WORD COLOR',
+    'colorLabelText': 'OBJECT COLOR',
     'tab-howto': 'How to play',
     'tab-create': 'Create TTML',
     'info-p1': 'Upload an audio file and its matching <b>.ttml</b> file, then press <b>START</b>.',
+    'info-p-circle-title': '🔵 Click the Circle',
     'info-p2': 'Words will appear at random positions on screen, timed to the lyrics. <b>Click them</b> before they disappear!',
+    'info-p-beat-title': '🟦 Click to the Beat',
+    'info-p-beat': 'When a square flies in from the edge toward the hollow square at the center, <b>click anywhere</b> or press <b>Space</b> before it disappears!',
     'info-p3': 'A <b>ghost</b> circle previews where each word will appear 2 seconds before it shows up — just like osu!',
     'info-p4': '<b style="background:linear-gradient(90deg,#ff6b6b,#ffe97e,#7eff9c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">PERFECT</b> &lt;0.15s · <b style="color:#7ef2ff">GREAT</b> &lt;0.35s · <b style="color:#7eff9c">GOOD</b> &lt;0.55s · and more.',
     'create-tool-name': 'Create TTML — Word Sync Tool',
@@ -913,6 +1147,13 @@ const T = {
     'err-ttmllong': 'TTML duration exceeds audio duration. Please check your files.',
     'err-nowords': 'No words found in TTML file.',
     'miss-label': 'MISS',
+    'mode-popup-title': 'SELECT MODE',
+    'mode-popup-subtitle': 'CHOOSE YOUR GAME STYLE',
+    'mode-name-circle': 'Click the Circle',
+    'mode-desc-circle': 'Words appear as circles on screen. Click them in time with the lyrics!',
+    'mode-name-beat': 'Click to the Beat',
+    'mode-desc-beat': 'Squares fly in from the edges toward the center target. Click or press Space when they arrive!',
+    'mode-popup-cancel': 'CANCEL',
   },
   vi: {
     'ui-title': 'TTML RHYME',
@@ -935,11 +1176,14 @@ const T = {
     'end-acc-label': 'ĐỘ CHÍNH XÁC',
     'btn-play-again': 'CHƠI LẠI',
     'btn-back': 'QUAY LẠI',
-    'colorLabelText': 'MÀU CHỮ',
+    'colorLabelText': 'MÀU ĐỐI TƯỢNG',
     'tab-howto': 'Hướng dẫn',
     'tab-create': 'Tạo TTML',
     'info-p1': 'Tải lên tệp âm thanh và tệp <b>.ttml</b> tương ứng, sau đó nhấn <b>BẮT ĐẦU</b>.',
+    'info-p-circle-title': '🔵 Click the Circle',
     'info-p2': 'Các từ sẽ xuất hiện ở vị trí ngẫu nhiên trên màn hình, theo thời gian lời bài hát. <b>Nhấn vào chúng</b> trước khi biến mất!',
+    'info-p-beat-title': '🟦 Click to the Beat',
+    'info-p-beat': 'Khi hình vuông từ rìa chạy vào hình vuông rỗng ở trung tâm, <b>nhấn vào bất kỳ đâu</b> hoặc nhấn <b>Space</b> trước khi nó biến mất!',
     'info-p4': '<b style="background:linear-gradient(90deg,#ff6b6b,#ffe97e,#7eff9c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">PERFECT</b> &lt;0.15s · <b style="color:#7ef2ff">GREAT</b> &lt;0.35s · <b style="color:#7eff9c">GOOD</b> &lt;0.55s · và nhiều hơn.',
     'create-tool-name': 'Tạo TTML — Công Cụ Sync Từng Từ',
     'create-tool-desc': 'Dùng công cụ này để tạo tệp TTML có thời gian từng từ từ lời bài hát và âm thanh.',
@@ -949,17 +1193,25 @@ const T = {
     'err-ttmllong': 'Thời lượng TTML vượt quá thời lượng âm thanh. Vui lòng kiểm tra lại tệp.',
     'err-nowords': 'Không tìm thấy từ nào trong tệp TTML.',
     'miss-label': 'BỎ LỠ',
+    'mode-popup-title': 'CHỌN CHẾ ĐỘ',
+    'mode-popup-subtitle': 'CHỌN PHONG CÁCH CHƠI CỦA BẠN',
+    'mode-name-circle': 'Nhấn Vòng Tròn',
+    'mode-desc-circle': 'Các từ xuất hiện dưới dạng vòng tròn trên màn hình. Nhấn vào chúng đúng nhịp lời bài hát!',
+    'mode-name-beat': 'Click Theo Nhịp',
+    'mode-desc-beat': 'Các hình vuông bay từ rìa màn hình vào hình vuông tâm giữa. Nhấn chuột hoặc Space khi chúng đến!',
+    'mode-popup-cancel': 'HỦY',
   }
 };
 
 function t(key) { return T[currentLang][key] || T['en'][key] || key; }
 
 function applyTranslations() {
+  const modePopupKeys = ['mode-popup-title','mode-popup-subtitle','mode-name-circle','mode-desc-circle','mode-name-beat','mode-desc-beat','mode-popup-cancel'];
   const keys = Object.keys(T.en);
   keys.forEach(key => {
     const el = document.getElementById(key);
     if (!el) return;
-    if (['info-p1','info-p2','info-p4','create-tool-desc'].includes(key)) {
+    if (['info-p1','info-p2','info-p-beat','info-p4','create-tool-desc'].includes(key)) {
       el.innerHTML = t(key);
     } else {
       el.textContent = t(key);
@@ -1012,6 +1264,9 @@ document.getElementById('wordColorInput').addEventListener('input', (e) => {
   document.getElementById('colorDot').style.background = wordColor;
   document.getElementById('game-field')?.style.setProperty('--word-color', wordColor);
   Game.setWordColor(wordColor);
+  BeatGame.setWordColor(wordColor);
+  const targetSq = document.getElementById('beat-target-square');
+  if (targetSq) targetSq.style.borderColor = wordColor.replace(/^#/, '') ? wordColor : '#ffffff';
 });
 
 // ── File Inputs ────────────────────────────────────────────
@@ -1077,47 +1332,67 @@ function showError(msg) {
 }
 
 // ── Start / Stop ───────────────────────────────────────────
+let _selectedMode = 'circle';
+
 async function onStartClick() {
   if (!parsedWords.length) { showError(t('err-nottml')); return; }
   if (audioDuration === 0) { showError(t('err-noaudio')); return; }
   showError('');
+  openModePopup();
+}
+
+function openModePopup() {
+  document.getElementById('mode-popup-overlay').classList.add('active');
+}
+
+function closeModePopup() {
+  document.getElementById('mode-popup-overlay').classList.remove('active');
+}
+
+function onSelectMode(mode) {
+  _selectedMode = mode;
+  closeModePopup();
   document.getElementById('upload-screen').style.display = 'none';
   document.getElementById('game-screen').classList.add('active');
   _doStartGame();
 }
 
 let _isPaused = false;
+let _lastResult = null;
+
+function _activeGame() { return _selectedMode === 'beat' ? BeatGame : Game; }
 
 function onPauseClick() {
   _isPaused = true;
-  Game.pauseGame();
+  _activeGame().pauseGame();
   document.getElementById('pause-overlay').classList.add('active');
+  if (_selectedMode === 'beat') document.body.classList.remove('beat-mode');
 }
 
 function onResumeClick() {
   _isPaused = false;
   document.getElementById('pause-overlay').classList.remove('active');
-  Game.resumeGame();
+  _activeGame().resumeGame();
+  if (_selectedMode === 'beat') document.body.classList.add('beat-mode');
 }
 
 function onRestartClick() {
   _isPaused = false;
   document.getElementById('pause-overlay').classList.remove('active');
-  Game.stopGame();
+  _activeGame().stopGame();
   _doStartGame();
 }
 
 function onQuitClick() {
   _isPaused = false;
   document.getElementById('pause-overlay').classList.remove('active');
-  Game.stopGame();
+  _activeGame().stopGame();
   onBackToMenu();
 }
 
 function _doStartGame() {
   document.getElementById('end-screen').classList.remove('active');
   const field = document.getElementById('game-field');
-  // Preserve pause-overlay, only reset inner game elements
   field.innerHTML =
     `<div id="countdown-overlay"><div id="countdown-num"></div></div>` +
     `<div id="waiting-msg"><span id="waiting-text">${t('waiting-text')}</span></div>` +
@@ -1128,11 +1403,18 @@ function _doStartGame() {
     `<button class="btn" id="btn-restart" onclick="onRestartClick()">${t('btn-restart')}</button>` +
     `<button class="btn" style="color:#ff6e6e;border-color:#ff6e6e;" id="btn-quit" onclick="onQuitClick()">${t('btn-quit')}</button>` +
     `</div></div></div>`;
+  if (_selectedMode === 'beat') {
+    const sq = document.createElement('div');
+    sq.id = 'beat-target-square';
+    sq.style.borderColor = wordColor;
+    sq.style.setProperty('--word-color', wordColor);
+    field.appendChild(sq);
+  }
   updateHUD(0, 0, 0);
-  Game.setCallbacks({
-    onScoreUpdate: ({ score, combo, missCount }) => updateHUD(score, combo, missCount),
+  const callbacks = {
+    onScoreUpdate: ({ score, combo, missCount, hitCounts }) => updateHUD(score, combo, missCount, hitCounts),
     onMiss: ({ word, x, y }) => showMissLabel(word, x, y),
-    onGameEnd: ({ score, missCount, total }) => showEndScreen(score, missCount, total),
+    onGameEnd: ({ score, missCount, total, hitCounts }) => showEndScreen(score, missCount, total, hitCounts),
     onCountdown: (n) => showCountdown(n),
     onWaiting: (firstTime) => {
       const wm = document.getElementById('waiting-msg');
@@ -1140,10 +1422,17 @@ function _doStartGame() {
       setTimeout(() => { if (wm) wm.classList.remove('visible'); }, Math.max(0, (firstTime - 5) * 1000 - 500));
     },
     onWordHit: ({ label, color, x, y }) => showHitLabel(label, color, x, y),
-  });
+  };
   field.style.setProperty('--word-color', wordColor);
-  Game.setWordColor(wordColor);
-  Game.startGame(parsedWords, wordColor);
+  if (_selectedMode === 'beat') {
+    BeatGame.setCallbacks(callbacks);
+    BeatGame.setWordColor(wordColor);
+    BeatGame.startGame(parsedWords, wordColor);
+  } else {
+    Game.setCallbacks(callbacks);
+    Game.setWordColor(wordColor);
+    Game.startGame(parsedWords, wordColor);
+  }
 }
 
 function onPlayAgain() {
@@ -1151,17 +1440,55 @@ function onPlayAgain() {
 }
 
 function onBackToMenu() {
-  Game.stopGame();
+  _activeGame().stopGame();
   document.getElementById('game-screen').classList.remove('active');
   document.getElementById('upload-screen').style.display = '';
   document.getElementById('end-screen').classList.remove('active');
+  showLastResult();
+}
+
+function showLastResult() {
+  if (!_lastResult) return;
+  const box = document.getElementById('last-result-box');
+  const stats = document.getElementById('last-result-stats');
+  const hc = _lastResult.hitCounts || {};
+  const items = [
+    { label: 'SCORE', val: _lastResult.score, color: 'var(--accent)' },
+    { label: 'ACC', val: _lastResult.acc + '%', color: 'var(--accent)' },
+    { label: 'MISS', val: _lastResult.missCount, color: '#ff6e6e' },
+    { label: 'PERFECT', val: hc.PERFECT ?? 0, color: 'url(#pg)' },
+    { label: 'GREAT', val: hc.GREAT ?? 0, color: '#7ef2ff' },
+    { label: 'GOOD', val: hc.GOOD ?? 0, color: '#7eff9c' },
+    { label: 'OK', val: hc.OK ?? 0, color: '#ffe97e' },
+    { label: 'LATE', val: hc.LATE ?? 0, color: '#ff9f7e' },
+    { label: 'BAD', val: hc.BAD ?? 0, color: '#ff6e6e' },
+  ];
+  stats.innerHTML = items.map(it => {
+    const isPerfect = it.label === 'PERFECT';
+    const numStyle = isPerfect
+      ? `style="background:linear-gradient(90deg,#ff6b6b,#ffe97e,#7eff9c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-weight:700;font-size:13px;"`
+      : `style="color:${it.color};font-weight:700;font-size:13px;"`;
+    const isMiss = it.label === 'MISS';
+    return `<span class="last-result-item${isMiss ? ' miss' : ''}">
+      ${it.label} <b ${numStyle}>${it.val}</b>
+    </span>`;
+  }).join('');
+  box.style.display = '';
 }
 
 // ── HUD update ─────────────────────────────────────────────
-function updateHUD(score, combo, missCount) {
+function updateHUD(score, combo, missCount, hitCounts) {
   document.getElementById('hud-score').textContent = score;
   document.getElementById('hud-combo').textContent = combo;
   document.getElementById('hud-miss').textContent = missCount;
+  if (hitCounts) {
+    document.getElementById('hud-perfect').textContent = hitCounts.PERFECT;
+    document.getElementById('hud-great').textContent = hitCounts.GREAT;
+    document.getElementById('hud-good').textContent = hitCounts.GOOD;
+    document.getElementById('hud-ok').textContent = hitCounts.OK;
+    document.getElementById('hud-late').textContent = hitCounts.LATE;
+    document.getElementById('hud-bad').textContent = hitCounts.BAD;
+  }
 }
 
 // ── Countdown ──────────────────────────────────────────────
@@ -1223,7 +1550,7 @@ function showMissLabel(word, x, y) {
 }
 
 // ── End screen ────────────────────────────────────────────
-function showEndScreen(score, missCount, total) {
+function showEndScreen(score, missCount, total, hitCounts) {
   const acc = total > 0 ? Math.round((score / total) * 100) : 0;
   document.getElementById('end-score').textContent = score;
   document.getElementById('end-miss').textContent = missCount;
@@ -1234,6 +1561,15 @@ function showEndScreen(score, missCount, total) {
   document.getElementById('end-acc-label').textContent = t('end-acc-label');
   document.getElementById('btn-play-again').textContent = t('btn-play-again');
   document.getElementById('btn-back').textContent = t('btn-back');
+  if (hitCounts) {
+    document.getElementById('end-perfect').textContent = hitCounts.PERFECT;
+    document.getElementById('end-great').textContent = hitCounts.GREAT;
+    document.getElementById('end-good').textContent = hitCounts.GOOD;
+    document.getElementById('end-ok').textContent = hitCounts.OK;
+    document.getElementById('end-late').textContent = hitCounts.LATE;
+    document.getElementById('end-bad').textContent = hitCounts.BAD;
+  }
+  _lastResult = { score, missCount, acc, hitCounts };
   document.getElementById('end-screen').classList.add('active');
 }
 
