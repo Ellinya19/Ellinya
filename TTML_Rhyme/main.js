@@ -1028,6 +1028,7 @@ const Game = (() => {
     setWordColor,
     getCurrentTime: () => getCurrentTime(),
     getScore: () => ({ score, combo, missCount, hitCounts }),
+    getAudioDuration: () => audioDuration,
   };
 })();
 
@@ -1121,9 +1122,12 @@ const BeatGame = (() => {
       onWaiting:     () => {},
       onWordHit:     () => {},
       onAudioEnd:    () => {
-        // Nhạc hết → chờ các square cuối xử lý xong rồi kết thúc
-        setTimeout(() => { if (gameRunning) endGame(); }, (WORD_LINGER + 0.5) * 1000);
+        // Nhạc hết → chờ square cuối xử lý xong rồi kết thúc và hiện end screen
+        setTimeout(() => {
+          if (gameRunning) endGame();
+        }, (WORD_LINGER + 0.5) * 1000);
       },
+      onGameEnd:     () => {},
     });
 
     // Hide the target square until countdown finishes (req 2)
@@ -1173,6 +1177,15 @@ const BeatGame = (() => {
           e.preventDefault();
           e.stopPropagation();
           handleBeatClick(best.id, best.el, best.word, best.idx);
+        } else {
+          // Không có square nào trong hitbox → miss square tiếp theo theo thứ tự idx
+          e.preventDefault();
+          let nextMiss = null, nextIdx = Infinity;
+          for (const [sid, entry] of activeSquares) {
+            const eidx = parseInt(entry.el.dataset.wordIdx ?? '-1', 10);
+            if (eidx < nextIdx) { nextIdx = eidx; nextMiss = { id: sid, word: entry.word }; }
+          }
+          if (nextMiss) handleBeatMiss(nextMiss.id, nextMiss.word);
         }
       }
       _fieldClickHandler = onFieldClick;
@@ -1201,6 +1214,16 @@ const BeatGame = (() => {
     await Game.startGame([], wordColor);
     isPlaying = true;
     isPaused = false;
+
+    // Fallback: poll audio time, trigger endGame khi nhạc hết
+    // Đảm bảo end screen luôn hiện dù onAudioEnd callback bị miss
+    const dur = Game.getAudioDuration();
+    if (dur > 0) {
+      const remaining = (dur - offset) * 1000 + (WORD_LINGER + 1.0) * 1000;
+      setTimeout(() => {
+        if (gameRunning) endGame();
+      }, remaining);
+    }
   }
 
   // ── Word Scheduling ───────────────────────────────────────
@@ -1473,7 +1496,17 @@ const BeatGame = (() => {
       const idx = parseInt(entry.el.dataset.wordIdx ?? '-1', 10);
       if (idx < bestIdx) { bestIdx = idx; best = { id, el: entry.el, word: entry.word, idx }; }
     }
-    if (best) handleBeatClick(best.id, best.el, best.word, best.idx);
+    if (best) {
+      handleBeatClick(best.id, best.el, best.word, best.idx);
+    } else {
+      // Không có square hittable → miss square tiếp theo
+      let nextMiss = null, nextIdx = Infinity;
+      for (const [id, entry] of activeSquares) {
+        const idx = parseInt(entry.el.dataset.wordIdx ?? '-1', 10);
+        if (idx < nextIdx) { nextIdx = idx; nextMiss = { id, word: entry.word }; }
+      }
+      if (nextMiss) handleBeatMiss(nextMiss.id, nextMiss.word);
+    }
   });
 
   // ── Expose API ────────────────────────────────────────────
