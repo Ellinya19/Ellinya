@@ -1274,8 +1274,8 @@ const BeatGame = (() => {
     let arrived = false;
     let hittable = false;
 
-    // TARGET_HALF: radius of target square (280px / 2) + 19px hitbox padding (~5mm)
-    const TARGET_HALF = 159;
+    // TARGET_HALF: radius of target square (200px / 2) + 19px hitbox padding (~5mm)
+    const TARGET_HALF = 119;
 
     function animate() {
       if (!gameRunning || isPaused) { animFrameId = requestAnimationFrame(animate); return; }

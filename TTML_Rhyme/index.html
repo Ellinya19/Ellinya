@@ -772,8 +772,8 @@ header {
   position:absolute;
   top:50%;
   left:50%;
-  width:280px;
-  height:280px;
+  width:200px;
+  height:200px;
   transform:translate(-50%,-50%);
   border:2px solid var(--word-color, #ffffff);
   opacity:0.35;
@@ -956,8 +956,8 @@ body.beat-mode * {
       <span class="hud-hit-item" style="color:#7ef2ff;">GR:<b id="hud-great">0</b></span>
       <span class="hud-hit-item" style="color:#7eff9c;">GD:<b id="hud-good">0</b></span>
       <span class="hud-hit-item" style="color:#ffe97e;">OK:<b id="hud-ok">0</b></span>
-      <span class="hud-hit-item" style="color:#ff9f7e;">LT:<b id="hud-late">0</b></span>
-      <span class="hud-hit-item" style="color:#ff6e6e;">BD:<b id="hud-bad">0</b></span>
+      <span class="hud-hit-item" id="hud-late-wrap" style="color:#ff9f7e;">LT:<b id="hud-late">0</b></span>
+      <span class="hud-hit-item" id="hud-bad-wrap" style="color:#ff6e6e;">BD:<b id="hud-bad">0</b></span>
     </div>
     <button class="btn" id="pauseBtn" onclick="onPauseClick()">PAUSE</button>
   </div>
@@ -1015,11 +1015,11 @@ body.beat-mode * {
           <span class="end-stat-num" id="end-ok" style="color:#ffe97e;font-size:clamp(20px,3vw,36px);">0</span>
           <span class="end-stat-label">OK</span>
         </div>
-        <div class="end-stat">
+        <div class="end-stat" id="end-late-wrap">
           <span class="end-stat-num" id="end-late" style="color:#ff9f7e;font-size:clamp(20px,3vw,36px);">0</span>
           <span class="end-stat-label">LATE</span>
         </div>
-        <div class="end-stat">
+        <div class="end-stat" id="end-bad-wrap">
           <span class="end-stat-num" id="end-bad" style="color:#ff6e6e;font-size:clamp(20px,3vw,36px);">0</span>
           <span class="end-stat-label">BAD</span>
         </div>
@@ -1411,6 +1411,9 @@ function _doStartGame() {
     field.appendChild(sq);
   }
   updateHUD(0, 0, 0);
+  const isCircle = _selectedMode !== 'beat';
+  document.getElementById('hud-late-wrap').style.display = isCircle ? '' : 'none';
+  document.getElementById('hud-bad-wrap').style.display = isCircle ? '' : 'none';
   const callbacks = {
     onScoreUpdate: ({ score, combo, missCount, hitCounts }) => updateHUD(score, combo, missCount, hitCounts),
     onMiss: ({ word, x, y }) => showMissLabel(word, x, y),
@@ -1460,8 +1463,10 @@ function showLastResult() {
     { label: 'GREAT', val: hc.GREAT ?? 0, color: '#7ef2ff' },
     { label: 'GOOD', val: hc.GOOD ?? 0, color: '#7eff9c' },
     { label: 'OK', val: hc.OK ?? 0, color: '#ffe97e' },
-    { label: 'LATE', val: hc.LATE ?? 0, color: '#ff9f7e' },
-    { label: 'BAD', val: hc.BAD ?? 0, color: '#ff6e6e' },
+    ...(_lastResult.mode !== 'beat' ? [
+      { label: 'LATE', val: hc.LATE ?? 0, color: '#ff9f7e' },
+      { label: 'BAD', val: hc.BAD ?? 0, color: '#ff6e6e' },
+    ] : []),
   ];
   stats.innerHTML = items.map(it => {
     const isPerfect = it.label === 'PERFECT';
@@ -1486,8 +1491,10 @@ function updateHUD(score, combo, missCount, hitCounts) {
     document.getElementById('hud-great').textContent = hitCounts.GREAT;
     document.getElementById('hud-good').textContent = hitCounts.GOOD;
     document.getElementById('hud-ok').textContent = hitCounts.OK;
-    document.getElementById('hud-late').textContent = hitCounts.LATE;
-    document.getElementById('hud-bad').textContent = hitCounts.BAD;
+    const lateEl = document.getElementById('hud-late');
+    const badEl = document.getElementById('hud-bad');
+    if (lateEl) lateEl.textContent = hitCounts.LATE;
+    if (badEl) badEl.textContent = hitCounts.BAD;
   }
 }
 
@@ -1569,7 +1576,10 @@ function showEndScreen(score, missCount, total, hitCounts) {
     document.getElementById('end-late').textContent = hitCounts.LATE;
     document.getElementById('end-bad').textContent = hitCounts.BAD;
   }
-  _lastResult = { score, missCount, acc, hitCounts };
+  _lastResult = { score, missCount, acc, hitCounts, mode: _selectedMode };
+  const isCircle = _selectedMode !== 'beat';
+  document.getElementById('end-late-wrap').style.display = isCircle ? '' : 'none';
+  document.getElementById('end-bad-wrap').style.display = isCircle ? '' : 'none';
   document.getElementById('end-screen').classList.add('active');
 }
 
