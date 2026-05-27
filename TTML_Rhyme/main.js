@@ -185,7 +185,7 @@ const Game = (() => {
     });
 
     // Shift all word timings earlier to compensate audio latency
-    const TTML_OFFSET = -0.4;
+    const TTML_OFFSET = -0.3;
     filtered.forEach(w => {
       w.begin = Math.max(0, w.begin - TTML_OFFSET);
       if (w.end !== null) w.end = Math.max(0, w.end - TTML_OFFSET);
@@ -289,16 +289,17 @@ const Game = (() => {
     }
   }
 
-  function beginPlayback(offset) {
+  async function beginPlayback(offset) {
     audioOffsetTime = offset;
     if (audioSource) {
       try { audioSource.stop(); } catch (e) {}
     }
+    if (audioContext.state !== 'running') await audioContext.resume();
     audioSource = audioContext.createBufferSource();
     audioSource.buffer = audioBuffer;
     audioSource.connect(audioContext.destination);
-    audioSource.start(0, offset);
     audioStartTime = audioContext.currentTime;
+    audioSource.start(0, offset);
     isPlaying = true;
     gameStarted = true;
 
@@ -310,6 +311,7 @@ const Game = (() => {
     };
 
     scheduleWords();
+    spawnLoop();
   }
 
   // ── Countdown ─────────────────────────────────────────────
@@ -331,33 +333,47 @@ const Game = (() => {
     if (!gameRunning) return;
 
     const now = getCurrentTime();
-    const LOOKAHEAD = 0.5; // seconds to look ahead
 
     words.forEach((word, idx) => {
       if (word._scheduled) return;
 
       const ghostTime = word.begin - GHOST_LEAD;
-      const mainTime = word.begin;
 
-      // Schedule ghost appearance
-      if (ghostTime <= now + LOOKAHEAD) {
+      // Mark as scheduled as soon as it enters lookahead window
+      if (ghostTime <= now + 0.5) {
         word._scheduled = true;
-        const ghostDelay = Math.max(0, (ghostTime - now) * 1000) + 100;
-        const mainDelay = Math.max(0, (mainTime - now) * 1000);
-
-        setTimeout(() => {
-          if (!gameRunning) return;
-          spawnGhostWord(word, idx);
-        }, ghostDelay);
-
-        setTimeout(() => {
-          if (!gameRunning) return;
-          spawnMainWord(word, idx);
-        }, mainDelay);
+        word._ghostSpawned = false;
+        word._mainSpawned = false;
       }
     });
 
-    scheduleTimer = setTimeout(scheduleWords, 200);
+    scheduleTimer = setTimeout(scheduleWords, 100);
+  }
+
+  // ── Frame-accurate spawn loop ─────────────────────────────
+  let _spawnFrameId = null;
+  function spawnLoop() {
+    if (!gameRunning) return;
+
+    const now = getCurrentTime();
+
+    words.forEach((word, idx) => {
+      if (!word._scheduled) return;
+
+      // Spawn ghost exactly when audio time passes ghostTime
+      if (!word._ghostSpawned && now >= word.begin - GHOST_LEAD) {
+        word._ghostSpawned = true;
+        spawnGhostWord(word, idx);
+      }
+
+      // Spawn main word exactly when audio time passes begin
+      if (!word._mainSpawned && now >= word.begin) {
+        word._mainSpawned = true;
+        spawnMainWord(word, idx);
+      }
+    });
+
+    _spawnFrameId = requestAnimationFrame(spawnLoop);
   }
 
   // ── Ghost Word ────────────────────────────────────────────
@@ -988,6 +1004,7 @@ const Game = (() => {
     audioStartTime += pausedDuration;
     audioContext.resume();
     scheduleWords();
+    spawnLoop();
   }
 
   // ── Word color setter ─────────────────────────────────────
@@ -1227,7 +1244,7 @@ const BeatGame = (() => {
     // Spawn from a random edge point
     const { sx, sy } = randomEdgePoint(cw, ch);
 
-    const SQUARE_SIZE = 50;
+    const SQUARE_SIZE = 36;
     const initialScale = 1.6 + Math.random() * 0.6; // start bigger
     const initialRotation = Math.random() * 360;
     const rotationSpeed = (Math.random() * 1.2 + 0.4) * (Math.random() < 0.5 ? 1 : -1); // deg/frame
@@ -1260,8 +1277,8 @@ const BeatGame = (() => {
     let arrived = false;
     let hittable = false;
 
-    // TARGET_HALF: radius of target square (226px / 2) + 19px hitbox padding (~5mm)
-    const TARGET_HALF = 132;
+    // TARGET_HALF: radius of target square (280px / 2) + 19px hitbox padding (~5mm)
+    const TARGET_HALF = 159;
 
     function animate() {
       if (!gameRunning || isPaused) { animFrameId = requestAnimationFrame(animate); return; }
@@ -1413,6 +1430,8 @@ const BeatGame = (() => {
   function endGame() {
     gameRunning = false;
     clearTimeout(scheduleTimer);
+    cancelAnimationFrame(_spawnFrameId);
+    cancelAnimationFrame(_spawnFrameId);
     activeSquares.forEach(entry => {
       cancelAnimationFrame(entry.animFrameId());
       entry.el.remove();
