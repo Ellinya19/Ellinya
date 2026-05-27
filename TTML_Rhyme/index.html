@@ -580,12 +580,12 @@ header {
 /* End screen */
 #end-screen {
   display:none;
-  position:absolute;
+  position:fixed;
   inset:0;
   background:rgba(0,0,0,0.92);
   align-items:center;
   justify-content:center;
-  z-index:100;
+  z-index:500;
   flex-direction:column;
   gap:24px;
   backdrop-filter:blur(4px);
@@ -1569,17 +1569,20 @@ function showEndScreen(score, missCount, total, hitCounts) {
   document.getElementById('btn-play-again').textContent = t('btn-play-again');
   document.getElementById('btn-back').textContent = t('btn-back');
   if (hitCounts) {
-    document.getElementById('end-perfect').textContent = hitCounts.PERFECT;
-    document.getElementById('end-great').textContent = hitCounts.GREAT;
-    document.getElementById('end-good').textContent = hitCounts.GOOD;
-    document.getElementById('end-ok').textContent = hitCounts.OK;
-    document.getElementById('end-late').textContent = hitCounts.LATE;
-    document.getElementById('end-bad').textContent = hitCounts.BAD;
+    document.getElementById('end-perfect').textContent = hitCounts.PERFECT ?? 0;
+    document.getElementById('end-great').textContent = hitCounts.GREAT ?? 0;
+    document.getElementById('end-good').textContent = hitCounts.GOOD ?? 0;
+    document.getElementById('end-ok').textContent = hitCounts.OK ?? 0;
+    const lateEl = document.getElementById('end-late');
+    const badEl  = document.getElementById('end-bad');
+    if (lateEl) lateEl.textContent = hitCounts.LATE ?? 0;
+    if (badEl)  badEl.textContent  = hitCounts.BAD  ?? 0;
   }
   _lastResult = { score, missCount, acc, hitCounts, mode: _selectedMode };
   const isCircle = _selectedMode !== 'beat';
   document.getElementById('end-late-wrap').style.display = isCircle ? '' : 'none';
-  document.getElementById('end-bad-wrap').style.display = isCircle ? '' : 'none';
+  document.getElementById('end-bad-wrap').style.display  = isCircle ? '' : 'none';
+  document.getElementById('game-screen').classList.add('active');
   document.getElementById('end-screen').classList.add('active');
 }
 

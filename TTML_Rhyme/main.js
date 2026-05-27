@@ -234,7 +234,7 @@ const Game = (() => {
   }
 
   // ── Start Game ────────────────────────────────────────────
-  async function startGame(ttmlWords, color) {
+  async function startGame(ttmlWords, color, { skipCountdown = false } = {}) {
     if (!audioBuffer || !audioContext) return;
     wordColor = color || '#ffffff';
     words = ttmlWords;
@@ -264,6 +264,11 @@ const Game = (() => {
 
     // Resume AudioContext if suspended
     if (audioContext.state === 'suspended') await audioContext.resume();
+
+    if (skipCountdown) {
+      beginPlayback(0);
+      return;
+    }
 
     const firstWordTime = words[0]?.begin ?? 0;
 
@@ -1211,7 +1216,7 @@ const BeatGame = (() => {
   // ── Beat begin playback (delegates audio to Game's engine) ─
   async function _beatBeginPlayback(offset) {
     // Game.startGame with empty words = audio-only; BeatGame schedules its own visuals
-    await Game.startGame([], wordColor);
+    await Game.startGame([], wordColor, { skipCountdown: true });
     isPlaying = true;
     isPaused = false;
 
@@ -1450,8 +1455,6 @@ const BeatGame = (() => {
   function endGame() {
     gameRunning = false;
     clearTimeout(scheduleTimer);
-    cancelAnimationFrame(_spawnFrameId);
-    cancelAnimationFrame(_spawnFrameId);
     activeSquares.forEach(entry => {
       cancelAnimationFrame(entry.animFrameId());
       entry.el.remove();
