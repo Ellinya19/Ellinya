@@ -48,6 +48,7 @@ const Game = (() => {
   let onCountdown = () => {};
   let onWaiting = () => {};
   let onWordHit = () => {};
+  let onAudioEnd = () => {};
 
   function setCallbacks(cb) {
     onScoreUpdate = cb.onScoreUpdate || onScoreUpdate;
@@ -56,6 +57,7 @@ const Game = (() => {
     onCountdown = cb.onCountdown || onCountdown;
     onWaiting = cb.onWaiting || onWaiting;
     onWordHit = cb.onWordHit || onWordHit;
+    onAudioEnd = cb.onAudioEnd || onAudioEnd;
   }
 
   // ── TTML Parsing ─────────────────────────────────────────
@@ -306,6 +308,7 @@ const Game = (() => {
     audioSource.onended = () => {
       if (isPlaying) {
         isPlaying = false;
+        onAudioEnd();
         setTimeout(() => endGame(), 1000);
       }
     };
@@ -1117,6 +1120,10 @@ const BeatGame = (() => {
       onCountdown:   () => {},
       onWaiting:     () => {},
       onWordHit:     () => {},
+      onAudioEnd:    () => {
+        // Nhạc hết → chờ các square cuối xử lý xong rồi kết thúc
+        setTimeout(() => { if (gameRunning) endGame(); }, (WORD_LINGER + 0.5) * 1000);
+      },
     });
 
     // Hide the target square until countdown finishes (req 2)
@@ -1215,16 +1222,6 @@ const BeatGame = (() => {
         }, delay);
       }
     });
-
-    // Check end condition
-    const allScheduled = words.every(w => w._beatScheduled);
-    if (allScheduled && activeSquares.size === 0) {
-      const lastWord = words[words.length - 1];
-      if (lastWord && Game.getCurrentTime() > lastWord.begin + WORD_LINGER + 0.5) {
-        endGame();
-        return;
-      }
-    }
 
     scheduleTimer = setTimeout(scheduleBeatWords, 200);
   }
