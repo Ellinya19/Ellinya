@@ -185,7 +185,7 @@ const Game = (() => {
     });
 
     // Shift all word timings earlier to compensate audio latency
-    const TTML_OFFSET = -0.3;
+    const TTML_OFFSET = -0.2;
     filtered.forEach(w => {
       w.begin = Math.max(0, w.begin - TTML_OFFSET);
       if (w.end !== null) w.end = Math.max(0, w.end - TTML_OFFSET);
