@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LYRIC SYNC — Line Timing Tool</title>
+<title>LYRIC SYNC . Line Timing Tool</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&family=Lexend:wght@300;400;500&family=Be+Vietnam+Pro:wght@300;400;500&display=swap');
 
@@ -221,6 +221,59 @@
   .upload-zone p { font-size: 13px; color: var(--muted); }
   .upload-zone .filename { color: var(--accent); font-family: 'IBM Plex Mono', monospace; font-size: 11px; margin-top: 6px; }
 
+  .youtube-link-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .youtube-link-divider {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .youtube-link-input {
+    flex: 1;
+    min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 8px 10px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .youtube-link-input:focus { border-color: var(--accent); }
+
+  .media-video-wrap {
+    display: none;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    margin-bottom: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .media-video-wrap.active { display: block; }
+
+  .media-video-el {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+  }
+
+  #playbackSection.has-video { width: min(560px, 94vw); }
+
   .audio-player {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -418,6 +471,56 @@
   @keyframes pulse-red {
     0% { transform: scale(1.1); }
     100% { transform: scale(1); }
+  }
+
+  /* Per-line color swatch . Subtitle Mode only */
+  .word-color-input {
+    display: none;
+    position: absolute;
+    right: -3px;
+    bottom: -3px;
+    width: 12px;
+    height: 12px;
+    padding: 0;
+    border: 1px solid rgba(255,255,255,0.5);
+    border-radius: 50%;
+    overflow: hidden;
+    cursor: pointer;
+    background: none;
+    z-index: 2;
+  }
+  .word-color-input::-webkit-color-swatch-wrapper { padding: 0; }
+  .word-color-input::-webkit-color-swatch { border: none; border-radius: 50%; }
+  .word-color-input::-moz-color-swatch { border: none; border-radius: 50%; }
+  body.subtitle-mode .word-color-input { display: block; }
+
+  .mode-select-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .mode-select-btn {
+    flex: 1;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 9px 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mode-select-btn:hover { border-color: var(--accent); color: var(--text); }
+  .mode-select-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(232,255,71,0.06);
+  }
+  .mode-select-desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.7;
   }
 
   /* Instruction bar */
@@ -753,6 +856,14 @@
     box-shadow: 0 8px 32px rgba(0,0,0,0.5);
   }
   .info-panel.visible { display: block; }
+  .info-panel::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: 0;
+    right: 0;
+    height: 10px;
+  }
   .info-panel-title {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 10px;
@@ -1112,6 +1223,7 @@
     <button class="btn" id="undoBtn" disabled onclick="if(activeTab==='bv')bvUndoLast();else if(activeTab==='rv')rvUndoLast();else undoLast()">↩ UNDO</button>
     <button class="btn" id="resetBtn" onclick="resetOrDelete()" disabled>⟳ RESET</button>
     <button class="btn primary" id="exportBtn" onclick="exportTTML()" disabled>EXPORT TTML</button>
+    <button class="btn primary" id="exportSubtitleBtn" onclick="exportSubtitle()" disabled style="display:none;">EXPORT SUBTITLE</button>
     <div class="theme-picker-wrapper" id="themePickerWrapper">
       <button class="theme-btn" id="themeToggleBtn" onclick="toggleThemeDropdown()">
         <span class="theme-dot" id="themeDot" style="background:#e0e0e0;"></span>
@@ -1126,11 +1238,12 @@
         </button>
       </div>
     </div>
-    <div class="info-icon-wrapper" id="infoWrapper" onmouseenter="showInfoPanel()" onmouseleave="hideInfoPanel()" onclick="toggleInfoPanel()">
+    <div class="info-icon-wrapper" id="infoWrapper" onmouseenter="showInfoPanel()" onmouseleave="hideInfoPanel()">
       <span class="info-icon" style="font-size:24px;border:1px solid var(--border);padding:6px 10px;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">ⓘ</span>
       <div class="info-panel" id="infoPanel">
         <div class="info-panel-tabs">
           <button class="info-panel-tab active" data-tab="how-to-use" onclick="switchInfoTab('how-to-use');event.stopPropagation()">How to use</button>
+          <button class="info-panel-tab" data-tab="select-mode" onclick="switchInfoTab('select-mode');event.stopPropagation()">Select Mode</button>
           <button class="info-panel-tab" data-tab="other-tools" onclick="switchInfoTab('other-tools');event.stopPropagation()">Other Tools</button>
         </div>
         <div class="info-tab-content active" data-tab="how-to-use">
@@ -1142,6 +1255,14 @@
             <span>Entering <b>...</b> (ellipsis) in the lyrics will represent a section without lyrics. When exported, the ellipsis will be split into three separate dots spaced evenly apart.</span>
           </div>
         </div>
+        <div class="info-tab-content" data-tab="select-mode">
+          <div class="mode-select-row">
+            <button type="button" class="mode-select-btn active" id="modeBtnTtml" onclick="setAppMode('ttml')">TTML Mode</button>
+            <button type="button" class="mode-select-btn" id="modeBtnSubtitle" onclick="setAppMode('subtitle')">Subtitle Mode</button>
+          </div>
+          <div class="mode-select-desc" id="modeDescTtml">Standard TTML/XML export . import, best for lyric-video renderers and general TTML-based pipelines.</div>
+          <div class="mode-select-desc" id="modeDescSubtitle" style="display:none;">YouTube-style captioning . export/import as <b>.ass</b> or YouTube's own subtitle format, with per-line color for karaoke-style captions.</div>
+        </div>
         <div class="info-tab-content" data-tab="other-tools">
           <div class="other-tool-item">
             <a class="other-tool-name" href="https://ellinya19.github.io/Ellinya/SyncLyrics_Words/index.html" target="_blank">Word Level Timing Tool</a>
@@ -1149,7 +1270,7 @@
           </div>
           <div class="other-tool-item">
             <a class="other-tool-name other-tool-name-rhyme" href="https://ellinya19.github.io/Ellinya/TTML_Rhyme/" target="_blank">TTML Rhyme</a>
-            <span class="other-tool-desc other-tool-desc-rhyme">A game tool for TTML files — play along to lyrics like Osu!</span>
+            <span class="other-tool-desc other-tool-desc-rhyme">A game tool for TTML files . play along to lyrics like Osu!</span>
           </div>
         </div>
       </div>
@@ -1170,17 +1291,21 @@
   <div class="left-panel">
 
     <div>
-      <div class="section-label" style="color:var(--s01-color);">01 — Audio File</div>
+      <div class="section-label" style="color:var(--s01-color);">01 . Audio File</div>
       <div class="upload-zone" id="uploadZone">
-        <input type="file" id="audioFile" accept="audio/*" onchange="loadAudio(this)">
+        <input type="file" id="mediaFile" accept="audio/*,video/*" onchange="loadMedia(this)">
         <div class="upload-icon">🎵</div>
-        <p>Drop audio file here<br>or click to browse</p>
-        <div class="filename" id="audioFilename"></div>
+        <p id="mediaUploadP">Drop audio or video file here<br>or click to browse</p>
+        <div class="filename" id="mediaFilename"></div>
+      </div>
+      <div class="youtube-link-row">
+        <span class="youtube-link-divider" id="youtubeLinkDivider">or paste a YouTube link</span>
+        <input type="text" id="youtubeLinkInput" class="youtube-link-input" placeholder="https://youtube.com/watch?v=..." onchange="loadYouTubeLink(this.value)">
       </div>
     </div>
 
     <div class="lyrics-input-area">
-      <div class="section-label" style="color:var(--s06-color);">02 — Import TTML</div>
+      <div class="section-label" style="color:var(--s06-color);">02 . Import TTML</div>
       <div class="upload-zone" id="ttmlImportZone" style="border-color:color-mix(in srgb, var(--s06-color) 40%, transparent);">
         <input type="file" id="ttmlImportFile" accept=".ttml,.xml" onchange="importTTML(this)">
         <div class="upload-icon">📄</div>
@@ -1190,9 +1315,13 @@
     </div>
 
     <div id="playbackSection">
-      <div class="drag-handle" id="playbackDragHandle">⠿ 03 — Playback</div>
+      <div class="drag-handle" id="playbackDragHandle">⠿ 03 . Playback</div>
       <div class="playback-inner">
-      <div class="section-label" style="color:var(--s02-color);margin-bottom:8px;">03 — Playback</div>
+      <div class="section-label" style="color:var(--s02-color);margin-bottom:8px;">03 . Playback</div>
+      <div class="media-video-wrap" id="mediaVideoWrap">
+        <video class="media-video-el" id="videoPlayerEl" style="display:none;" playsinline></video>
+        <div class="media-video-el" id="youtubePlayerContainer" style="display:none;"></div>
+      </div>
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:nowrap;">
         <div class="time-display" style="justify-content:flex-start;gap:8px;flex-shrink:0;">
           <span id="currentTime">00:00.000</span>
@@ -1220,7 +1349,7 @@
     </div>
 
     <div class="lyrics-input-area">
-      <div class="section-label" style="color:var(--s03-color);">04 — Lyrics</div>
+      <div class="section-label" style="color:var(--s03-color);">04 . Lyrics</div>
       <textarea class="lyrics-textarea" id="lyricsInput" placeholder="Paste lyrics here..."></textarea>
       <div style="margin-top: 12px; display: flex; gap: 8px;">
         <button class="btn primary" style="flex:1" id="loadLyricsBtn" onclick="handleLoadOrUpdateLyrics()">LOAD LYRICS</button>
@@ -1230,7 +1359,7 @@
     <div class="stats-bar" id="statsBar"></div>
 
     <div class="lyrics-input-area">
-      <div class="section-label" style="color:var(--s04-color);">05 — Additional Lyrics</div>
+      <div class="section-label" style="color:var(--s04-color);">05 . Additional Lyrics</div>
       <textarea class="lyrics-textarea" id="rvInput" placeholder="Paste right-side lyrics here..." style="border-color:color-mix(in srgb, var(--rv-color) 30%, transparent);"></textarea>
       <div style="margin-top: 12px; display: flex; gap: 8px;">
         <button class="btn" style="flex:1;border-color:var(--rv-color);color:var(--rv-color);" id="loadRVBtn" onclick="handleLoadOrUpdateRV()">LOAD ADDITIONAL LYRICS</button>
@@ -1239,7 +1368,7 @@
     </div>
 
     <div class="lyrics-input-area">
-      <div class="section-label" style="color:var(--s05-color);">06 — Backing Vocal</div>
+      <div class="section-label" style="color:var(--s05-color);">06 . Backing Vocal</div>
       <textarea class="lyrics-textarea" id="bvInput" placeholder="Paste backing vocal lyrics here..." style="border-color:color-mix(in srgb, var(--accent) 30%, transparent);"></textarea>
       <div style="margin-top: 12px; display: flex; gap: 8px;">
         <button class="btn" style="flex:1;border-color:var(--accent);color:var(--accent);" id="loadBVBtn" onclick="handleLoadOrUpdateBV()">LOAD BACKING VOCAL</button>
@@ -1263,9 +1392,9 @@
   <!-- RIGHT PANELS -->
   <div class="right-panels">
     <div class="sync-tabs" id="syncTabsBar">
-      <button class="sync-tab active" id="tab-lyric" onclick="switchTab('lyric')">04 — LYRIC SYNC</button>
-      <button class="sync-tab" id="tab-rv" onclick="switchTab('rv')" style="color:color-mix(in srgb, var(--s04-color) 50%, transparent);">05 — ADDITIONAL LYRICS</button>
-      <button class="sync-tab" id="tab-bv" onclick="switchTab('bv')" style="color:color-mix(in srgb, var(--s05-color) 50%, transparent);">06 — BACKING VOCAL</button>
+      <button class="sync-tab active" id="tab-lyric" onclick="switchTab('lyric')">04 . LYRIC SYNC</button>
+      <button class="sync-tab" id="tab-rv" onclick="switchTab('rv')" style="color:color-mix(in srgb, var(--s04-color) 50%, transparent);">05 . ADDITIONAL LYRICS</button>
+      <button class="sync-tab" id="tab-bv" onclick="switchTab('bv')" style="color:color-mix(in srgb, var(--s05-color) 50%, transparent);">06 . BACKING VOCAL</button>
     </div>
 
     <div class="sync-panels-wrapper" id="syncPanelsWrapper">
@@ -1277,7 +1406,7 @@
             <div class="empty-state">
               <div class="big-icon">🎤</div>
               <h3>Ready to Sync</h3>
-              <p>Load audio and lyrics, then hold SPACE / ↓ while the music plays to stamp each line's timing.</p>
+              <p>Load audio and lyrics, then sync here.</p>
             </div>
           </div>
         </div>
@@ -1287,7 +1416,7 @@
           <div class="key-hint"><div class="key">P</div><span>Play / Pause</span></div>
           <div class="key-hint"><div class="key">← →</div><span>Seek ±2s</span></div>
           <div class="key-hint"><div class="key">DBLCLICK</div><span>Edit word text directly.</span></div>
-          <div class="key-hint"><div class="key">CLICK (done line)</div><span>Re-sync from this line</span></div>
+          <div class="key-hint"><div class="key">CLICK (done)</div><span>Re-sync from this line</span></div>
           <span class="status-msg" id="statusMsg"></span>
         </div>
       </div>
@@ -1305,7 +1434,7 @@
             </div>
           </div>
         </div>
-        <div class="instruction-bar" style="border-top-color:color-mix(in srgb, var(--rv-color) 20%, transparent);">
+        <div class="instruction-bar">
           <div class="key-hint"><div class="key">HOLD SPACE / ↓</div><span>Sync word (begin→end)</span></div>
           <div class="key-hint"><div class="key">Z / ↑</div><span>Undo last stamp</span></div>
           <div class="key-hint"><div class="key">P</div><span>Play / Pause</span></div>
@@ -1329,7 +1458,7 @@
             </div>
           </div>
         </div>
-        <div class="instruction-bar" style="border-top-color:color-mix(in srgb, var(--accent) 20%, transparent);">
+        <div class="instruction-bar">
           <div class="key-hint"><div class="key">HOLD SPACE / ↓</div><span>Sync word (begin→end)</span></div>
           <div class="key-hint"><div class="key">Z / ↑</div><span>Undo last stamp</span></div>
           <div class="key-hint"><div class="key">P</div><span>Play / Pause</span></div>
@@ -1358,7 +1487,7 @@
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <div class="modal-header">
-      <h2>TTML Export</h2>
+      <h2 id="exportModalTitle">TTML Export</h2>
       <button class="btn" onclick="closeModal()">✕ CLOSE</button>
     </div>
     <div class="modal-body">
@@ -1366,7 +1495,9 @@
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="copyTTML()">📋 COPY</button>
-      <button class="btn primary" onclick="downloadTTML()">⬇ DOWNLOAD .ttml</button>
+      <button class="btn primary" id="downloadSingleBtn" onclick="downloadTTML()">⬇ <span id="downloadBtnLabel">DOWNLOAD .ttml</span></button>
+      <button class="btn primary" id="downloadAssBtn" onclick="downloadSubtitleAs('ass')" style="display:none;">⬇ DOWNLOAD .ASS</button>
+      <button class="btn primary" id="downloadYttBtn" onclick="downloadSubtitleAs('ytt')" style="display:none;">⬇ DOWNLOAD YTT</button>
     </div>
   </div>
 </div>
@@ -1384,11 +1515,11 @@
 <div class="modal-overlay" id="ttmlImportModal">
   <div class="modal" style="max-width:480px;">
     <div class="modal-header">
-      <h2 style="color:var(--s06-color);">Import TTML</h2>
+      <h2 id="ttmlImportModalTitle" style="color:var(--s06-color);">Import TTML</h2>
     </div>
     <div class="modal-body" style="padding:28px 24px;">
-      <p style="font-size:14px;line-height:1.8;color:var(--text);">Do you want to <b style="color:var(--s06-color);">keep the timing</b> from the TTML file?</p>
-      <p style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.7;">— <b>Yes</b>: Lyrics will be included with full timing (already synced).<br>— <b>No</b>: Keep only plain text, without timing.</p>
+      <p id="ttmlImportModalP1" style="font-size:14px;line-height:1.8;color:var(--text);">Do you want to <b style="color:var(--s06-color);">keep the timing</b> from the TTML file?</p>
+      <p style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.7;">. <b>Yes</b>: Lyrics will be included with full timing (already synced).<br>. <b>No</b>: Keep only plain text, without timing.</p>
     </div>
     <div class="modal-footer" style="justify-content:center;gap:16px;">
       <button class="btn primary" style="min-width:100px;background:var(--s06-color);border-color:var(--s06-color);" onclick="confirmTTMLImport(true)">✓ Yes</button>
@@ -1400,6 +1531,10 @@
 <script>
 // ─── STATE ───────────────────────────────────────────────────────────────────
 let audio = null;
+let mediaMode = 'audio'; // 'audio' | 'video' | 'youtube' . which source currently drives playback
+let appMode = 'ttml'; // 'ttml' | 'subtitle' . controls export/import format and per-line color UI
+let ytPlayer = null;
+let ytApiReadyCallbacks = [];
 let words = [];       // [{text, begin, end, lineIndex}]
 let timings = [];     // [{begin, end}] — end filled when next is stamped
 let currentIndex = 0;
@@ -1546,7 +1681,7 @@ function handleLoadOrUpdateLyrics() {
   renderWords(); updateStats(); updateUndoBtn(); updateResetDeleteBtn();
   updateLoadBtnState('loadLyricsBtn', words.some(w => w.begin !== null));
   const preservedLines = [...new Set(result.filter(w=>w.begin!==null).map(w=>w.lineIndex))].length;
-  setStatus(`Lyrics updated — ${preservedLines} line timings preserved ✓`, 'ok');
+  setStatus(`Lyrics updated . ${preservedLines} line timings preserved ✓`, 'ok');
 }
 
 function handleLoadOrUpdateRV() {
@@ -1566,7 +1701,7 @@ function handleLoadOrUpdateRV() {
   rvRenderWords(); rvUpdateStats(); updateUndoBtn(); updateResetDeleteBtn();
   updateLoadBtnState('loadRVBtn', rvWords.some(w => w.begin !== null));
   const rvPreservedLines = [...new Set(result.filter(w=>w.begin!==null).map(w=>w.lineIndex))].length;
-  setRVStatus(`Additional Lyrics updated — ${rvPreservedLines} line timings preserved ✓`, 'ok');
+  setRVStatus(`Additional Lyrics updated . ${rvPreservedLines} line timings preserved ✓`, 'ok');
 }
 
 function handleLoadOrUpdateBV() {
@@ -1586,19 +1721,25 @@ function handleLoadOrUpdateBV() {
   bvRenderWords(); bvUpdateStats(); updateResetDeleteBtn(); updateUndoBtn();
   updateLoadBtnState('loadBVBtn', bvWords.some(w => w.begin !== null));
   const bvPreservedLines = [...new Set(result.filter(w=>w.begin!==null).map(w=>w.lineIndex))].length;
-  setBVStatus(`Backing Vocal updated — ${bvPreservedLines} line timings preserved ✓`, 'ok');
+  setBVStatus(`Backing Vocal updated . ${bvPreservedLines} line timings preserved ✓`, 'ok');
 }
 
-// ─── TTML IMPORT ─────────────────────────────────────────────────────────────
+// ─── TTML / ASS / YTT IMPORT ───────────────────────────────────────────────────
 let _pendingTTMLContent = null;
+let _pendingImportFormat = 'ttml'; // 'ttml' | 'ass' | 'ytt'
 
 function importTTML(input) {
   const file = input.files[0];
   if (!file) return;
   document.getElementById('ttmlImportFilename').textContent = file.name;
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  _pendingImportFormat = ext === 'ass' ? 'ass' : (ext === 'ytt' || ext === 'srv3') ? 'ytt' : 'ttml';
+  const formatLabel = _pendingImportFormat === 'ass' ? 'ASS' : _pendingImportFormat === 'ytt' ? 'YTT' : 'TTML';
   const reader = new FileReader();
   reader.onload = (e) => {
     _pendingTTMLContent = e.target.result;
+    document.getElementById('ttmlImportModalTitle').textContent = 'Import ' + formatLabel;
+    document.getElementById('ttmlImportModalP1').innerHTML = `Do you want to <b style="color:var(--s06-color);">keep the timing</b> from the ${formatLabel} file?`;
     document.getElementById('ttmlImportModal').classList.add('visible');
   };
   reader.readAsText(file);
@@ -1608,7 +1749,9 @@ function importTTML(input) {
 function confirmTTMLImport(keepTiming) {
   document.getElementById('ttmlImportModal').classList.remove('visible');
   if (!_pendingTTMLContent) return;
-  parseTTMLContent(_pendingTTMLContent, keepTiming);
+  if (_pendingImportFormat === 'ass') parseASSContent(_pendingTTMLContent, keepTiming);
+  else if (_pendingImportFormat === 'ytt') parseYTTContent(_pendingTTMLContent, keepTiming);
+  else parseTTMLContent(_pendingTTMLContent, keepTiming);
   _pendingTTMLContent = null;
 }
 
@@ -1711,15 +1854,6 @@ function parseTTMLContent(xmlText, keepTiming) {
       return merged;
     }
 
-    function buildLineText(tokens, withTiming) {
-      if (!tokens.length) return '';
-      let result = tokens[0].text;
-      for (let i = 1; i < tokens.length; i++) {
-        result += (tokens[i].noSpaceBefore ? '' : ' ') + tokens[i].text;
-      }
-      return result;
-    }
-
     function buildSyncedChips(canvas, tokens) {
       canvas.innerHTML = '';
       let lineDiv = document.createElement('div');
@@ -1787,126 +1921,8 @@ function parseTTMLContent(xmlText, keepTiming) {
       });
     });
 
-    // ─ Fill textareas (plain text, bất kể keepTiming) ────────────────────────
-    if (mainLines.length) {
-      document.getElementById('lyricsInput').value = mainLines.map(l => buildLineText(l, false)).join('\n');
-    } else {
-      document.getElementById('lyricsInput').value = '';
-      words = []; timings = []; currentIndex = 0; endSyncStamped = false; reSyncTargetIndex = null;
-      renderWords(); updateStats();
-      document.getElementById('exportBtn').disabled = true;
-      updateUndoBtn();
-    }
-    if (rvLines.length) {
-      document.getElementById('rvInput').value = rvLines.map(l => buildLineText(l, false)).join('\n');
-    } else {
-      document.getElementById('rvInput').value = '';
-      rvWords = []; rvTimings = []; rvCurrentIndex = 0; rvEndSyncStamped = false; rvReSyncTargetIndex = null;
-      rvRenderWords(); rvUpdateStats();
-    }
-    if (bvLines.length) {
-      document.getElementById('bvInput').value = bvLines.map(l => buildLineText(l, false)).join('\n');
-    } else {
-      document.getElementById('bvInput').value = '';
-      bvWords = []; bvTimings = []; bvCurrentIndex = 0; bvEndSyncStamped = false; bvReSyncTargetIndex = null;
-      bvRenderWords(); bvUpdateStats();
-    }
-
-    // ─ Nếu chỉ lấy text (không giữ timing): auto load vào bảng sync ─────────
-    if (!keepTiming) {
-      if (mainLines.length) loadLyrics();
-      if (rvLines.length) loadRV();
-      if (bvLines.length) loadBV();
-    }
-
-    // ─ Show preview in import panel ──────────────────────────────────────────
-    const canvas = document.getElementById('importCanvas');
-    canvas.innerHTML = '';
-
-    function addSection(label, color, lines) {
-      if (!lines.length) return;
-      const sec = document.createElement('div');
-      sec.style.cssText = 'margin-bottom:24px;width:100%;';
-      const lbl = document.createElement('div');
-      lbl.className = 'section-label';
-      lbl.style.color = color;
-      lbl.textContent = label;
-      sec.appendChild(lbl);
-      lines.forEach(tokens => {
-        const row = document.createElement('div');
-        row.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px 4px;margin-bottom:8px;';
-        tokens.forEach(t => {
-          const chip = document.createElement('div');
-          chip.className = 'word-chip ' + (keepTiming ? 'done' : 'pending');
-          chip.textContent = t.text;
-          if (keepTiming && t.begin !== undefined) {
-            chip.title = `${formatTime(t.begin)} → ${formatTime(t.end||t.begin)}`;
-          }
-          row.appendChild(chip);
-        });
-        sec.appendChild(row);
-      });
-      canvas.appendChild(sec);
-    }
-
-    addSection('04 — Lyrics', 'var(--s03-color)', mainLines);
-    addSection('05 — Additional Lyrics', 'var(--s04-color)', rvLines);
-    addSection('06 — Backing Vocal', 'var(--s05-color)', bvLines);
-
-    // ─ If keepTiming: load synced words into sync tabs ────────────────────────
-    if (keepTiming) {
-      // Nếu không có data → bảng sync đã được clear ở bước fill textarea ở trên
-      function tokensToWords(lines) {
-        const result = [];
-        lines.forEach((tokens, li) => {
-          tokens.forEach(t => {
-            const isDotGroup = t.text === '...';
-            result.push({ text: t.text, ttmlText: t.text, begin: t.begin ?? 0, end: t.end ?? 0, lineIndex: li, isDotGroup, isDot: false, isBsPart: false, bsIndex: -1, isHyphenPart: false, hyphenIndex: -1 });
-          });
-        });
-        return result;
-      }
-      function timingsFromWords(ws) {
-        return ws.map(w => ({ begin: w.begin, end: w.end }));
-      }
-
-      if (mainLines.length) {
-        words = tokensToWords(mainLines);
-        timings = timingsFromWords(words);
-        currentIndex = words.length;
-        endSyncStamped = true;
-        renderWords();
-        updateStats();
-        document.getElementById('exportBtn').disabled = false;
-      }
-      if (rvLines.length) {
-        rvWords = tokensToWords(rvLines);
-        rvTimings = timingsFromWords(rvWords);
-        rvCurrentIndex = rvWords.length;
-        rvEndSyncStamped = true;
-        rvRenderWords();
-        rvUpdateStats();
-      }
-      if (bvLines.length) {
-        bvWords = tokensToWords(bvLines);
-        bvTimings = timingsFromWords(bvWords);
-        bvCurrentIndex = bvWords.length;
-        bvEndSyncStamped = true;
-        bvRenderWords();
-        bvUpdateStats();
-      }
-    }
-
-    if (mainLines.length) window._baseline_lyricsInput = document.getElementById('lyricsInput').value;
-    if (rvLines.length) window._baseline_rvInput = document.getElementById('rvInput').value;
-    if (bvLines.length) window._baseline_bvInput = document.getElementById('bvInput').value;
-    refreshAllLoadBtns();
-    updateResetDeleteBtn();
-    updateUndoBtn();
-    const total = mainLines.length + rvLines.length + bvLines.length;
-    const msg = `✓ ${total} lines imported` + (keepTiming ? ` (with timing)` : ` (text only)`);
-    document.getElementById('importStatusMsg').textContent = msg;
-    setTimeout(() => { document.getElementById('importStatusMsg').textContent = ''; }, 4000);
+    // ─ Apply parsed lines to app state (textareas, sync tabs, preview) ────────
+    applyParsedLines(mainLines, rvLines, bvLines, keepTiming);
 
   } catch(err) {
     console.error(err);
@@ -1921,25 +1937,193 @@ function splitWord(word) {
   return [{ display: word, ttml: word }];
 }
 
-// ─── AUDIO ───────────────────────────────────────────────────────────────────
-function loadAudio(input) {
-  const file = input.files[0];
-  if (!file) return;
-  songTitle = file.name.replace(/\.[^.]+$/, '');
-  document.getElementById('audioFilename').textContent = file.name;
-
-  if (audio) { audio.pause(); audio.src = ''; }
-  audio = new Audio(URL.createObjectURL(file));
-
-  audio.addEventListener('timeupdate', updateProgress);
-  audio.addEventListener('ended', () => {
+// ─── AUDIO / VIDEO / YOUTUBE ───────────────────────────────────────────────────
+// Only one media source (audio file, video file, or YouTube link) is active at
+// a time. Switching sources silently discards whichever one was active before .
+// no confirmation, no toast. Whatever object currently drives playback is always
+// kept in the single global `audio` variable so all existing sync logic
+// (audio.currentTime, audio.duration, audio.play/pause, audio.playbackRate ...)
+// keeps working unchanged regardless of the active source.
+function attachMediaEvents(m) {
+  m.addEventListener('timeupdate', updateProgress);
+  m.addEventListener('ended', () => {
     isPlaying = false;
     document.getElementById('playBtn').textContent = '▶';
   });
-  audio.addEventListener('loadedmetadata', () => {
-    document.getElementById('totalTime').textContent = formatTime(audio.duration);
+  m.addEventListener('loadedmetadata', () => {
+    document.getElementById('totalTime').textContent = formatTime(m.duration);
   });
+}
+
+function activateMediaSource(type) {
+  if (audio) {
+    if (audio._stopPoll) audio._stopPoll();
+    try { audio.pause(); } catch (e) {}
+  }
+  if (mediaMode === 'youtube' && type !== 'youtube' && ytPlayer && ytPlayer.destroy) {
+    try { ytPlayer.destroy(); } catch (e) {}
+    ytPlayer = null;
+  }
+  isPlaying = false;
+  document.getElementById('playBtn').textContent = '▶';
+  mediaMode = type;
+
+  if (type === 'youtube') {
+    document.getElementById('mediaFilename').textContent = '';
+    document.getElementById('mediaFile').value = '';
+    document.getElementById('videoPlayerEl').removeAttribute('src');
+  } else {
+    document.getElementById('youtubeLinkInput').value = '';
+    if (type === 'audio') document.getElementById('videoPlayerEl').removeAttribute('src');
+  }
+
+  const wrap = document.getElementById('mediaVideoWrap');
+  const vEl = document.getElementById('videoPlayerEl');
+  const ytEl = document.getElementById('youtubePlayerContainer');
+  wrap.classList.toggle('active', type !== 'audio');
+  vEl.style.display = type === 'video' ? 'block' : 'none';
+  ytEl.style.display = type === 'youtube' ? 'block' : 'none';
+  document.getElementById('playbackSection').classList.toggle('has-video', type !== 'audio');
+}
+
+function loadMedia(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.type.startsWith('video/')) {
+    loadVideoFile(file);
+  } else if (file.type.startsWith('audio/')) {
+    loadAudioFile(file);
+  } else {
+    setStatus('Unsupported file type', 'err');
+  }
+}
+
+function loadAudioFile(file) {
+  activateMediaSource('audio');
+  songTitle = file.name.replace(/\.[^.]+$/, '');
+  document.getElementById('mediaFilename').textContent = file.name;
+
+  audio = new Audio(URL.createObjectURL(file));
+  attachMediaEvents(audio);
   setStatus('Audio loaded ✓', 'ok');
+}
+
+function loadVideoFile(file) {
+  activateMediaSource('video');
+  songTitle = file.name.replace(/\.[^.]+$/, '');
+  document.getElementById('mediaFilename').textContent = file.name;
+
+  // Swap in a fresh <video> element so no stale listeners pile up across loads
+  const old = document.getElementById('videoPlayerEl');
+  const fresh = old.cloneNode(false);
+  fresh.id = 'videoPlayerEl';
+  fresh.className = old.className;
+  fresh.playsInline = true;
+  fresh.style.display = 'block';
+  old.replaceWith(fresh);
+
+  fresh.src = URL.createObjectURL(file);
+  audio = fresh;
+  attachMediaEvents(audio);
+  setStatus('Video loaded ✓', 'ok');
+}
+
+function extractYouTubeId(url) {
+  const m = (url || '').match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+
+function ensureYouTubeAPI(callback) {
+  if (window.YT && window.YT.Player) { callback(); return; }
+  ytApiReadyCallbacks.push(callback);
+  if (!document.getElementById('youtubeAPIScript')) {
+    const tag = document.createElement('script');
+    tag.id = 'youtubeAPIScript';
+    tag.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(tag);
+  }
+}
+
+window.onYouTubeIframeAPIReady = function () {
+  ytApiReadyCallbacks.forEach(cb => cb());
+  ytApiReadyCallbacks = [];
+};
+
+function loadYouTubeLink(url) {
+  const id = extractYouTubeId(url);
+  if (!id) {
+    if (url && url.trim()) setStatus('Invalid YouTube link', 'err');
+    return;
+  }
+  // Strip playlist/radio/tracking params . keep only the canonical short link
+  const shortUrl = 'https://www.youtube.com/watch?v=' + id;
+  document.getElementById('youtubeLinkInput').value = shortUrl;
+
+  activateMediaSource('youtube');
+  songTitle = 'youtube_' + id;
+  ensureYouTubeAPI(() => createYTPlayer(id));
+}
+
+function createYTPlayer(id) {
+  const container = document.getElementById('youtubePlayerContainer');
+  container.innerHTML = '';
+  const mount = document.createElement('div');
+  container.appendChild(mount);
+
+  const playerVars = { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1 };
+  if (location.origin && location.origin !== 'null') playerVars.origin = location.origin;
+
+  ytPlayer = new YT.Player(mount, {
+    videoId: id,
+    width: '100%',
+    height: '100%',
+    playerVars: playerVars,
+    events: {
+      onReady: () => {
+        audio = createYTAdapter(ytPlayer);
+        attachMediaEvents(audio);
+        document.getElementById('totalTime').textContent = formatTime(audio.duration);
+        setStatus('YouTube video loaded ✓', 'ok');
+      },
+      onStateChange: (e) => {
+        if (!audio || !audio._fire) return;
+        if (e.data === YT.PlayerState.ENDED) audio._fire('ended');
+        if (e.data === YT.PlayerState.PLAYING) { isPlaying = true; document.getElementById('playBtn').textContent = '⏸'; }
+        if (e.data === YT.PlayerState.PAUSED) { isPlaying = false; document.getElementById('playBtn').textContent = '▶'; }
+      },
+      onError: (e) => {
+        const messages = {
+          2: 'Invalid YouTube video ID',
+          5: 'This video cannot be played in the HTML5 player',
+          100: 'Video not found or was removed',
+          101: 'Owner disabled embedding for this video',
+          150: 'Owner disabled embedding for this video',
+          153: 'Owner blocked embedding for this domain . try serving the file over http(s):// instead of opening it directly (file://)'
+        };
+        setStatus('YouTube error: ' + (messages[e.data] || ('code ' + e.data)), 'err');
+      }
+    }
+  });
+}
+
+function createYTAdapter(player) {
+  const listeners = { timeupdate: [], ended: [], loadedmetadata: [] };
+  const adapter = {
+    get currentTime() { return player.getCurrentTime ? player.getCurrentTime() : 0; },
+    set currentTime(v) { player.seekTo(v, true); },
+    get duration() { return player.getDuration ? player.getDuration() : 0; },
+    get playbackRate() { return player.getPlaybackRate ? player.getPlaybackRate() : 1; },
+    set playbackRate(v) { player.setPlaybackRate(v); },
+    play() { player.playVideo(); },
+    pause() { player.pauseVideo(); },
+    addEventListener(type, cb) { if (listeners[type]) listeners[type].push(cb); },
+    _fire(type) { (listeners[type] || []).forEach(cb => cb()); },
+    src: ''
+  };
+  const pollTimer = setInterval(() => adapter._fire('timeupdate'), 100);
+  adapter._stopPoll = () => clearInterval(pollTimer);
+  setTimeout(() => adapter._fire('loadedmetadata'), 300);
+  return adapter;
 }
 
 function togglePlay() {
@@ -2102,6 +2286,7 @@ function renderWords() {
       e.stopPropagation();
       startEditChip(chip, firstIdx);
     });
+    chip.appendChild(createColorSwatch(entries));
 
     // Time badge
     const timeBadge = document.createElement('div');
@@ -2189,7 +2374,7 @@ function stampWordEnd() {
       });
       endSyncStamped = true;
       renderWords();
-      setStatus('Sync complete ✓ — Export TTML!', 'ok');
+      setStatus('Sync complete ✓ . Export TTML!', 'ok');
       checkExportReady();
     } else {
       setStatus('Sync already complete!', 'ok');
@@ -2227,8 +2412,8 @@ function stampWordEnd() {
     checkExportReady();
     const jumpEl = document.getElementById(`word-${currentIndex}`);
     if (jumpEl) jumpEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    const lineNum = currentIndex < words.length ? words[currentIndex].lineIndex + 1 : '—';
-    setStatus(`Re-sync done${endSyncStamped ? ' — all synced! Export TTML ✓' : ` — resumed at line ${lineNum} ✓`}`, 'ok');
+    const lineNum = currentIndex < words.length ? words[currentIndex].lineIndex + 1 : '.';
+    setStatus(`Re-sync done${endSyncStamped ? ' . all synced! Export TTML ✓' : ` . resumed at line ${lineNum} ✓`}`, 'ok');
     return;
   }
 
@@ -2236,7 +2421,7 @@ function stampWordEnd() {
     reSyncTargetIndex = null;
     endSyncStamped = true;
     renderWords();
-    setStatus('Sync complete ✓ — Export TTML!', 'ok');
+    setStatus('Sync complete ✓ . Export TTML!', 'ok');
   }
 
   checkExportReady();
@@ -2247,7 +2432,7 @@ function stampWordEnd() {
 function undoLast() {
   if (currentIndex === 0 && !endSyncStamped) return;
 
-  // If undoing from endSync zone — undo the last line
+  // If undoing from endSync zone . undo the last line
   if (currentIndex >= words.length && endSyncStamped) {
     endSyncStamped = false;
     checkExportReady();
@@ -2427,7 +2612,7 @@ function updateStats() {
   document.getElementById('statsBar').innerHTML = `
     <span><b>${doneLines}</b> / ${totalLines} lines</span>
     <span><b>${pctLines}%</b> done</span>
-    ${currentIndex < total ? `<span>Next: <b>${nextLineWords || '—'}</b></span>` : '<span style="color:var(--accent)"><b>COMPLETE</b></span>'}
+    ${currentIndex < total ? `<span>Next: <b>${nextLineWords || '.'}</b></span>` : '<span style="color:var(--accent)"><b>COMPLETE</b></span>'}
   `;
 }
 
@@ -2455,7 +2640,7 @@ function reSyncFromWord(index) {
   renderWords();
   updateStats();
   const reLineWords = words.filter(w => w.lineIndex === words[index].lineIndex).map(w => w.text).join(' ');
-  setStatus(`Re-syncing line "${reLineWords}" — hold SPACE / ↓ to stamp ✓`, 'ok');
+  setStatus(`Re-syncing line "${reLineWords}" . hold SPACE / ↓ to stamp ✓`, 'ok');
   const el = document.getElementById(`word-${index}`);
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
@@ -2703,6 +2888,7 @@ function bvRenderWords() {
     }
 
     chip.addEventListener('dblclick', (e) => { e.stopPropagation(); bvStartEditChip(chip, firstBvIdx); });
+    chip.appendChild(createColorSwatch(entries));
     row.appendChild(chip);
     row.appendChild(timeBadge);
     canvas.appendChild(row);
@@ -2753,7 +2939,7 @@ function bvStampWordEnd() {
       });
       bvEndSyncStamped = true;
       bvRenderWords();
-      setBVStatus('BV sync complete ✓ — Export TTML!', 'ok');
+      setBVStatus('BV sync complete ✓ . Export TTML!', 'ok');
       checkExportReady();
     } else {
       setBVStatus('Sync complete ✓', 'ok');
@@ -2784,14 +2970,14 @@ function bvStampWordEnd() {
     bvUpdateStats();
     const jumpEl = document.getElementById(`bv-word-${bvCurrentIndex}`);
     if (jumpEl) jumpEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    setBVStatus(`Re-sync done — resumed at line ${bvCurrentIndex < bvWords.length ? bvWords[bvCurrentIndex].lineIndex + 1 : '—'} ✓`, 'ok');
+    setBVStatus(`Re-sync done . resumed at line ${bvCurrentIndex < bvWords.length ? bvWords[bvCurrentIndex].lineIndex + 1 : '.'} ✓`, 'ok');
     return;
   }
 
   if (bvCurrentIndex >= bvWords.length) {
     bvEndSyncStamped = true;
     bvRenderWords();
-    setBVStatus('BV sync complete ✓ — Export TTML!', 'ok');
+    setBVStatus('BV sync complete ✓ . Export TTML!', 'ok');
   }
 
   checkExportReady();
@@ -2842,7 +3028,7 @@ function bvUpdateStats() {
   document.getElementById('bvStatsBar').innerHTML = total > 0 ? `
     <span><b>${bvDoneLines}</b> / ${bvTotalLines} lines</span>
     <span><b>${bvPctLines}%</b> done</span>
-    ${bvCurrentIndex < total ? `<span>Next: <b>${bvNextLine || '—'}</b></span>` : '<span style="color:#6eb4ff"><b>COMPLETE</b></span>'}
+    ${bvCurrentIndex < total ? `<span>Next: <b>${bvNextLine || '.'}</b></span>` : '<span style="color:#6eb4ff"><b>COMPLETE</b></span>'}
   ` : '';
 }
 
@@ -2869,7 +3055,7 @@ function bvReSyncFromWord(index) {
   bvRenderWords();
   bvUpdateStats();
   const bvReLineWords = bvWords.filter(w => w.lineIndex === bvWords[index].lineIndex).map(w => w.text).join(' ');
-  setBVStatus(`Re-syncing line "${bvReLineWords}" — hold SPACE / ↓ to stamp ✓`, 'ok');
+  setBVStatus(`Re-syncing line "${bvReLineWords}" . hold SPACE / ↓ to stamp ✓`, 'ok');
   const el = document.getElementById(`bv-word-${index}`);
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
@@ -3002,6 +3188,7 @@ function rvRenderWords() {
     }
 
     chip.addEventListener('dblclick', (e) => { e.stopPropagation(); rvStartEditChip(chip, firstRvIdx); });
+    chip.appendChild(createColorSwatch(entries));
 
     const timeBadge = document.createElement('div');
     timeBadge.id = `rv-line-time-${lineIdx}`;
@@ -3058,7 +3245,7 @@ function rvStampWordEnd() {
       });
       rvEndSyncStamped = true;
       rvRenderWords();
-      setRVStatus('Additional Lyrics sync complete ✓ — Export TTML!', 'ok');
+      setRVStatus('Additional Lyrics sync complete ✓ . Export TTML!', 'ok');
       checkExportReady();
     } else {
       setRVStatus('Sync complete ✓', 'ok');
@@ -3089,14 +3276,14 @@ function rvStampWordEnd() {
     rvUpdateStats();
     const jumpEl = document.getElementById(`rv-word-${rvCurrentIndex}`);
     if (jumpEl) jumpEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    setRVStatus(`Re-sync done — resumed at line ${rvCurrentIndex < rvWords.length ? rvWords[rvCurrentIndex].lineIndex + 1 : '—'} ✓`, 'ok');
+    setRVStatus(`Re-sync done . resumed at line ${rvCurrentIndex < rvWords.length ? rvWords[rvCurrentIndex].lineIndex + 1 : '.'} ✓`, 'ok');
     return;
   }
 
   if (rvCurrentIndex >= rvWords.length) {
     rvEndSyncStamped = true;
     rvRenderWords();
-    setRVStatus('Additional Lyrics sync complete ✓ — Export TTML!', 'ok');
+    setRVStatus('Additional Lyrics sync complete ✓ . Export TTML!', 'ok');
   }
 
   checkExportReady();
@@ -3147,7 +3334,7 @@ function rvUpdateStats() {
   document.getElementById('rvStatsBar').innerHTML = total > 0 ? `
     <span><b>${rvDoneLines}</b> / ${rvTotalLines} lines</span>
     <span><b>${rvPctLines}%</b> done</span>
-    ${rvCurrentIndex < total ? `<span>Next: <b>${rvNextLine || '—'}</b></span>` : '<span style="color:#6eb4ff"><b>COMPLETE</b></span>'}
+    ${rvCurrentIndex < total ? `<span>Next: <b>${rvNextLine || '.'}</b></span>` : '<span style="color:#6eb4ff"><b>COMPLETE</b></span>'}
   ` : '';
 }
 
@@ -3174,7 +3361,7 @@ function rvReSyncFromWord(index) {
   rvRenderWords();
   rvUpdateStats();
   const rvReLineWords = rvWords.filter(w => w.lineIndex === rvWords[index].lineIndex).map(w => w.text).join(' ');
-  setRVStatus(`Re-syncing line "${rvReLineWords}" — hold SPACE / ↓ to stamp ✓`, 'ok');
+  setRVStatus(`Re-syncing line "${rvReLineWords}" . hold SPACE / ↓ to stamp ✓`, 'ok');
   const el = document.getElementById(`rv-word-${index}`);
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
@@ -3237,9 +3424,9 @@ function exportTTML() {
   const bvStampedCheck = bvWords.filter(w => w.begin !== null);
   const rvStampedCheck = rvWords.filter(w => w.begin !== null);
   if (stamped.length === 0 && bvStampedCheck.length === 0 && rvStampedCheck.length === 0) { setStatus('Nothing to export', 'err'); return; }
-  if (bvWords.length > 0 && (!bvEndSyncStamped || bvStampedCheck.length < bvWords.length)) { setStatus('Backing Vocal not fully synced — please complete it before exporting!', 'err'); return; }
-  if (rvWords.length > 0 && (!rvEndSyncStamped || rvStampedCheck.length < rvWords.length)) { setStatus('Additional Lyrics not fully synced — please complete it before exporting!', 'err'); return; }
-  if (words.length > 0 && (!endSyncStamped || stamped.length < words.length)) { setStatus('Main lyrics not fully synced — please complete it before exporting!', 'err'); return; }
+  if (bvWords.length > 0 && (!bvEndSyncStamped || bvStampedCheck.length < bvWords.length)) { setStatus('Backing Vocal not fully synced . please complete it before exporting!', 'err'); return; }
+  if (rvWords.length > 0 && (!rvEndSyncStamped || rvStampedCheck.length < rvWords.length)) { setStatus('Additional Lyrics not fully synced . please complete it before exporting!', 'err'); return; }
+  if (words.length > 0 && (!endSyncStamped || stamped.length < words.length)) { setStatus('Main lyrics not fully synced . please complete it before exporting!', 'err'); return; }
 
   const bvStamped = bvWords.filter(w => w.begin !== null);
   const hasBV = bvStamped.length > 0;
@@ -3440,6 +3627,23 @@ return mainPTag;
   document.getElementById('ttmlOutput').textContent = ttml;
   document.getElementById('modalOverlay').classList.add('visible');
   window._ttmlContent = ttml;
+  window._exportFilename = `${songTitle}.ttml`;
+  window._exportMime = 'application/ttml+xml';
+  document.getElementById('exportModalTitle').textContent = 'TTML Export';
+  document.getElementById('downloadBtnLabel').textContent = 'DOWNLOAD .ttml';
+  document.getElementById('downloadSingleBtn').style.display = '';
+  document.getElementById('downloadAssBtn').style.display = 'none';
+  document.getElementById('downloadYttBtn').style.display = 'none';
+}
+
+function openExportModal(content, filename, mimeType, modalTitle) {
+  document.getElementById('ttmlOutput').textContent = content;
+  document.getElementById('exportModalTitle').textContent = modalTitle;
+  document.getElementById('downloadBtnLabel').textContent = 'DOWNLOAD ' + filename.slice(filename.lastIndexOf('.'));
+  document.getElementById('modalOverlay').classList.add('visible');
+  window._ttmlContent = content;
+  window._exportFilename = filename;
+  window._exportMime = mimeType;
 }
 
 function toTTMLTime(sec) {
@@ -3455,16 +3659,424 @@ function escapeXML(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+// ─── SHARED IMPORT PIPELINE (used by TTML / ASS / YTT parsers) ────────────────
+function buildLineText(tokens, withTiming) {
+  if (!tokens.length) return '';
+  let result = tokens[0].text;
+  for (let i = 1; i < tokens.length; i++) {
+    result += (tokens[i].noSpaceBefore ? '' : ' ') + tokens[i].text;
+  }
+  return result;
+}
+
+// Applies parsed [mainLines, rvLines, bvLines] (arrays of token arrays, each
+// token = {text, begin?, end?, noSpaceBefore?, color?}) to the whole app state:
+// textareas, sync tabs (words/rvWords/bvWords), preview canvas, buttons.
+function applyParsedLines(mainLines, rvLines, bvLines, keepTiming) {
+  if (mainLines.length) {
+    document.getElementById('lyricsInput').value = mainLines.map(l => buildLineText(l, false)).join('\n');
+  } else {
+    document.getElementById('lyricsInput').value = '';
+    words = []; timings = []; currentIndex = 0; endSyncStamped = false; reSyncTargetIndex = null;
+    renderWords(); updateStats();
+    document.getElementById('exportBtn').disabled = true;
+    updateUndoBtn();
+  }
+  if (rvLines.length) {
+    document.getElementById('rvInput').value = rvLines.map(l => buildLineText(l, false)).join('\n');
+  } else {
+    document.getElementById('rvInput').value = '';
+    rvWords = []; rvTimings = []; rvCurrentIndex = 0; rvEndSyncStamped = false; rvReSyncTargetIndex = null;
+    rvRenderWords(); rvUpdateStats();
+  }
+  if (bvLines.length) {
+    document.getElementById('bvInput').value = bvLines.map(l => buildLineText(l, false)).join('\n');
+  } else {
+    document.getElementById('bvInput').value = '';
+    bvWords = []; bvTimings = []; bvCurrentIndex = 0; bvEndSyncStamped = false; bvReSyncTargetIndex = null;
+    bvRenderWords(); bvUpdateStats();
+  }
+
+  if (!keepTiming) {
+    if (mainLines.length) loadLyrics();
+    if (rvLines.length) loadRV();
+    if (bvLines.length) loadBV();
+  }
+
+  const canvas = document.getElementById('importCanvas');
+  canvas.innerHTML = '';
+
+  function addSection(label, color, lines) {
+    if (!lines.length) return;
+    const sec = document.createElement('div');
+    sec.style.cssText = 'margin-bottom:24px;width:100%;';
+    const lbl = document.createElement('div');
+    lbl.className = 'section-label';
+    lbl.style.color = color;
+    lbl.textContent = label;
+    sec.appendChild(lbl);
+    lines.forEach(tokens => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px 4px;margin-bottom:8px;';
+      tokens.forEach(t => {
+        const chip = document.createElement('div');
+        chip.className = 'word-chip ' + (keepTiming ? 'done' : 'pending');
+        chip.textContent = t.text;
+        if (keepTiming && t.begin !== undefined) {
+          chip.title = `${formatTime(t.begin)} → ${formatTime(t.end||t.begin)}`;
+        }
+        row.appendChild(chip);
+      });
+      sec.appendChild(row);
+    });
+    canvas.appendChild(sec);
+  }
+
+  addSection('04 . Lyrics', 'var(--s03-color)', mainLines);
+  addSection('05 . Additional Lyrics', 'var(--s04-color)', rvLines);
+  addSection('06 . Backing Vocal', 'var(--s05-color)', bvLines);
+
+  if (keepTiming) {
+    function tokensToWords(lines) {
+      const result = [];
+      lines.forEach((tokens, li) => {
+        tokens.forEach(t => {
+          const isDotGroup = t.text === '...';
+          result.push({ text: t.text, ttmlText: t.text, begin: t.begin ?? 0, end: t.end ?? 0, lineIndex: li, isDotGroup, isDot: false, isBsPart: false, bsIndex: -1, isHyphenPart: false, hyphenIndex: -1, color: t.color || null });
+        });
+      });
+      return result;
+    }
+    function timingsFromWords(ws) {
+      return ws.map(w => ({ begin: w.begin, end: w.end }));
+    }
+
+    if (mainLines.length) {
+      words = tokensToWords(mainLines);
+      timings = timingsFromWords(words);
+      currentIndex = words.length;
+      endSyncStamped = true;
+      renderWords();
+      updateStats();
+      document.getElementById('exportBtn').disabled = false;
+    }
+    if (rvLines.length) {
+      rvWords = tokensToWords(rvLines);
+      rvTimings = timingsFromWords(rvWords);
+      rvCurrentIndex = rvWords.length;
+      rvEndSyncStamped = true;
+      rvRenderWords();
+      rvUpdateStats();
+    }
+    if (bvLines.length) {
+      bvWords = tokensToWords(bvLines);
+      bvTimings = timingsFromWords(bvWords);
+      bvCurrentIndex = bvWords.length;
+      bvEndSyncStamped = true;
+      bvRenderWords();
+      bvUpdateStats();
+    }
+  }
+
+  if (mainLines.length) window._baseline_lyricsInput = document.getElementById('lyricsInput').value;
+  if (rvLines.length) window._baseline_rvInput = document.getElementById('rvInput').value;
+  if (bvLines.length) window._baseline_bvInput = document.getElementById('bvInput').value;
+  refreshAllLoadBtns();
+  updateResetDeleteBtn();
+  updateUndoBtn();
+  const total = mainLines.length + rvLines.length + bvLines.length;
+  const msg = `✓ ${total} lines imported` + (keepTiming ? ` (with timing)` : ` (text only)`);
+  document.getElementById('importStatusMsg').textContent = msg;
+  setTimeout(() => { document.getElementById('importStatusMsg').textContent = ''; }, 4000);
+}
+
+function groupWordsByLineIndex(wordsArr) {
+  const map = {};
+  wordsArr.forEach(w => {
+    const li = w.lineIndex !== undefined ? w.lineIndex : 0;
+    if (!map[li]) map[li] = [];
+    map[li].push(w);
+  });
+  return Object.keys(map).sort((a, b) => a - b).map(k => map[k]);
+}
+
+// ─── COLOR HELPERS (Subtitle Mode: per-line color, default white) ─────────────
+function pad2(n) { return String(Math.max(0, Math.min(99, n))).padStart(2, '0'); }
+
+function normalizeHexColor(hex) {
+  if (!hex) return 'FFFFFF';
+  hex = hex.replace('#', '').trim();
+  if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+  return (hex + 'FFFFFF').slice(0, 6).toUpperCase();
+}
+
+// ASS uses &HBBGGRR& (blue-green-red, reverse byte order of normal RGB hex)
+function rgbToAssColor(hex) {
+  const rgb = normalizeHexColor(hex);
+  const r = rgb.slice(0, 2), g = rgb.slice(2, 4), b = rgb.slice(4, 6);
+  return '&H' + (b + g + r) + '&';
+}
+
+function assColorToHex(assStr) {
+  const m = (assStr || '').match(/&H([0-9A-Fa-f]{6})&?/);
+  if (!m) return null;
+  const bgr = m[1].toUpperCase();
+  const b = bgr.slice(0, 2), g = bgr.slice(2, 4), r = bgr.slice(4, 6);
+  return '#' + r + g + b;
+}
+
+function escapeASSText(str) {
+  return (str || '').replace(/\{/g, '(').replace(/\}/g, ')');
+}
+
+function toASSTime(sec) {
+  if (sec === null || sec === undefined || isNaN(sec) || !isFinite(sec)) sec = 0;
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.floor(sec % 60);
+  const cs = Math.round((sec - Math.floor(sec)) * 100);
+  return `${h}:${pad2(m)}:${pad2(s)}.${pad2(cs)}`;
+}
+
+function assTimeToSec(t) {
+  const m = (t || '').match(/(\d+):(\d+):(\d+)(?:\.(\d+))?/);
+  if (!m) return 0;
+  return parseInt(m[1]) * 3600 + parseInt(m[2]) * 60 + parseInt(m[3]) + (m[4] ? parseInt(m[4]) / 100 : 0);
+}
+
+// ─── .ASS EXPORT (Subtitle Mode) ───────────────────────────────────────────────
+// Line-level tool . there is no per-word timing, so each line is a single plain
+// Dialogue event (no \k karaoke tags), just a \c color override for the line.
+function buildASSContent() {
+  const stamped = words.filter(w => w.begin !== null);
+  const rvStamped = rvWords.filter(w => w.begin !== null);
+  const bvStamped = bvWords.filter(w => w.begin !== null);
+
+  function lineDialogues(wordsArr, styleName) {
+    return groupWordsByLineIndex(wordsArr).map(lineWords => {
+      const lineBegin = lineWords[0].begin;
+      const lineEnd = lineWords[0].end !== null ? lineWords[0].end : lineBegin + 0.5;
+      const text = lineWords.map(w => escapeASSText(w.ttmlText || w.text)).join(' ');
+      return `Dialogue: 0,${toASSTime(lineBegin)},${toASSTime(lineEnd)},${styleName},,0,0,0,,{\\c${rgbToAssColor(lineWords[0].color)}}${text}`;
+    });
+  }
+
+  const events = [
+    ...lineDialogues(stamped, 'Default'),
+    ...lineDialogues(rvStamped, 'RV'),
+    ...lineDialogues(bvStamped, 'BV')
+  ].join('\n');
+
+  return `[Script Info]
+Title: ${songTitle}
+ScriptType: v4.00+
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+PlayResX: 384
+PlayResY: 288
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,28,&H00FFFFFF,&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,2,1,2,10,10,10,1
+Style: RV,Arial,24,&H00FFFFFF,&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,2,1,2,10,10,40,1
+Style: BV,Arial,20,&H00CCCCCC,&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,1,1,2,10,10,70,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+${events}
+`;
+}
+
+function checkSubtitleReady() {
+  const stamped = words.filter(w => w.begin !== null);
+  const bvStampedCheck = bvWords.filter(w => w.begin !== null);
+  const rvStampedCheck = rvWords.filter(w => w.begin !== null);
+  if (stamped.length === 0 && bvStampedCheck.length === 0 && rvStampedCheck.length === 0) { setStatus('Nothing to export', 'err'); return false; }
+  if (bvWords.length > 0 && (!bvEndSyncStamped || bvStampedCheck.length < bvWords.length)) { setStatus('Backing Vocal not fully synced . please complete it before exporting!', 'err'); return false; }
+  if (rvWords.length > 0 && (!rvEndSyncStamped || rvStampedCheck.length < rvWords.length)) { setStatus('Additional Lyrics not fully synced . please complete it before exporting!', 'err'); return false; }
+  if (words.length > 0 && (!endSyncStamped || stamped.length < words.length)) { setStatus('Main lyrics not fully synced . please complete it before exporting!', 'err'); return false; }
+  return true;
+}
+
+// Single "EXPORT SUBTITLE" button opens the same export modal used by TTML,
+// pre-filled with .ass content. The footer swaps its one DOWNLOAD button for
+// two format buttons (.ASS / YTT); COPY always copies whatever is shown.
+function exportSubtitle() {
+  if (!checkSubtitleReady()) return;
+  const content = buildASSContent();
+  openExportModal(content, `${songTitle}.ass`, 'text/plain', 'Subtitle Export');
+  document.getElementById('downloadSingleBtn').style.display = 'none';
+  document.getElementById('downloadAssBtn').style.display = '';
+  document.getElementById('downloadYttBtn').style.display = '';
+  setStatus('Subtitle ready ✓', 'ok');
+}
+
+function downloadSubtitleAs(fmt) {
+  const content = fmt === 'ass' ? buildASSContent() : buildYTTContent();
+  const filename = `${songTitle}.${fmt === 'ass' ? 'ass' : 'ytt'}`;
+  const mime = fmt === 'ass' ? 'text/plain' : 'application/xml';
+  document.getElementById('ttmlOutput').textContent = content;
+  window._ttmlContent = content;
+  window._exportFilename = filename;
+  window._exportMime = mime;
+  downloadTTML();
+}
+
+// ─── YOUTUBE-STYLE SUBTITLE (YTT / SRV3-flavoured) EXPORT (Subtitle Mode) ──────
+// Same disclaimer as the word-level tool: this follows the general srv3
+// <timedtext><body><p><s> structure (t/d in ms, a `role` attribute this tool
+// uses to tell main/RV/BV lines apart on re-import) but is meant for
+// round-tripping inside this tool, not guaranteed byte-identical to what
+// YouTube's own caption pipeline generates. Line-level here means one <s> per
+// line (no word-level spans), carrying the line's color.
+function buildYTTContent() {
+  const stamped = words.filter(w => w.begin !== null);
+  const rvStamped = rvWords.filter(w => w.begin !== null);
+  const bvStamped = bvWords.filter(w => w.begin !== null);
+
+  function lineParagraphs(wordsArr, role) {
+    return groupWordsByLineIndex(wordsArr).map(lineWords => {
+      const lineBegin = lineWords[0].begin;
+      const lineEnd = lineWords[0].end !== null ? lineWords[0].end : lineBegin + 0.5;
+      const tMs = Math.round(lineBegin * 1000);
+      const dMs = Math.max(1, Math.round((lineEnd - lineBegin) * 1000));
+      const text = lineWords.map(w => escapeXML(w.ttmlText || w.text)).join(' ');
+      return `<p t="${tMs}" d="${dMs}" role="${role}"><s t="0" ac="${normalizeHexColor(lineWords[0].color)}">${text}</s></p>`;
+    });
+  }
+
+  const paragraphs = [
+    ...lineParagraphs(stamped, 'main'),
+    ...lineParagraphs(rvStamped, 'rv'),
+    ...lineParagraphs(bvStamped, 'bv')
+  ].join('\n');
+
+  return `<?xml version="1.0" encoding="utf-8"?>
+<timedtext format="3">
+<head>
+<pen id="0" fc="#FFFFFF"/>
+</head>
+<body>
+${paragraphs}
+</body>
+</timedtext>
+`;
+}
+
+// ─── .ASS IMPORT ────────────────────────────────────────────────────────────
+function parseASSContent(text, keepTiming) {
+  try {
+    const mainLines = [], rvLines = [], bvLines = [];
+    const lines = text.split(/\r?\n/);
+    let inEvents = false;
+    let fieldOrder = ['Layer', 'Start', 'End', 'Style', 'Name', 'MarginL', 'MarginR', 'MarginV', 'Effect', 'Text'];
+
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      if (/^\[Events\]/i.test(trimmed)) { inEvents = true; return; }
+      if (/^\[/.test(trimmed)) { inEvents = false; return; }
+      if (!inEvents) return;
+      if (/^Format:/i.test(trimmed)) {
+        fieldOrder = trimmed.replace(/^Format:/i, '').split(',').map(s => s.trim());
+        return;
+      }
+      if (!/^Dialogue:/i.test(trimmed)) return;
+
+      const rest = trimmed.replace(/^Dialogue:\s*/i, '');
+      const startIdx = fieldOrder.indexOf('Start');
+      const endIdx = fieldOrder.indexOf('End');
+      const styleIdx = fieldOrder.indexOf('Style');
+      const textIdx = fieldOrder.indexOf('Text');
+      const parts = rest.split(',');
+      const begin = assTimeToSec(parts[startIdx]);
+      const end = assTimeToSec(parts[endIdx]);
+      const styleName = (parts[styleIdx] || 'Default').trim();
+      let rawText = parts.slice(textIdx).join(',');
+
+      let color = null;
+      const cMatch = rawText.match(/\{\\c(&H[0-9A-Fa-f]{6}&?)\}/);
+      if (cMatch) { color = assColorToHex(cMatch[1]); rawText = rawText.replace(cMatch[0], ''); }
+      rawText = rawText.replace(/\{[^}]*\}/g, '');
+
+      const lineText = rawText.trim();
+      if (!lineText) return;
+      const tokens = lineText.split(/\s+/).map(wt => ({ text: wt, begin, end, noSpaceBefore: false, color }));
+
+      if (styleName === 'RV') rvLines.push(tokens);
+      else if (styleName === 'BV') bvLines.push(tokens);
+      else mainLines.push(tokens);
+    });
+
+    applyParsedLines(mainLines, rvLines, bvLines, keepTiming);
+  } catch (err) {
+    console.error(err);
+    document.getElementById('importStatusMsg').textContent = '✗ Lỗi parse ASS: ' + err.message;
+  }
+}
+
+// ─── YTT / SRV3 IMPORT ──────────────────────────────────────────────────────
+function parseYTTContent(text, keepTiming) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, 'application/xml');
+    const pEls = Array.from(doc.querySelectorAll('p'));
+
+    const mainLines = [], rvLines = [], bvLines = [];
+
+    pEls.forEach(p => {
+      const role = (p.getAttribute('role') || 'main').toLowerCase();
+      const begin = parseFloat(p.getAttribute('t') || '0') / 1000;
+      const end = begin + parseFloat(p.getAttribute('d') || '0') / 1000;
+      const sEls = Array.from(p.querySelectorAll('s'));
+      let lineText, color = null;
+      if (sEls.length) {
+        lineText = sEls.map(s => s.textContent).join('').trim();
+        const ac = sEls[0].getAttribute('ac');
+        if (ac) color = '#' + normalizeHexColor(ac);
+      } else {
+        lineText = p.textContent.trim();
+      }
+      if (!lineText) return;
+      const tokens = lineText.split(/\s+/).map(wt => ({ text: wt, begin, end, noSpaceBefore: false, color }));
+      if (role === 'rv') rvLines.push(tokens);
+      else if (role === 'bv') bvLines.push(tokens);
+      else mainLines.push(tokens);
+    });
+
+    applyParsedLines(mainLines, rvLines, bvLines, keepTiming);
+  } catch (err) {
+    console.error(err);
+    document.getElementById('importStatusMsg').textContent = '✗ Lỗi parse YTT: ' + err.message;
+  }
+}
+
+// Small per-line color picker dot, shown only in Subtitle Mode (bottom-right
+// of the line chip). `entries` is the array of {w,i} live word references that
+// make up this line . mutating each w.color directly is enough, no re-render.
+function createColorSwatch(entries) {
+  const inp = document.createElement('input');
+  inp.type = 'color';
+  inp.className = 'word-color-input';
+  inp.value = '#' + normalizeHexColor(entries[0].w.color);
+  inp.title = 'Line color';
+  inp.addEventListener('click', e => e.stopPropagation());
+  inp.addEventListener('dblclick', e => e.stopPropagation());
+  inp.addEventListener('input', () => {
+    entries.forEach(({ w }) => { w.color = inp.value; });
+  });
+  return inp;
+}
+
 const copyTTML = function() {
   navigator.clipboard.writeText(window._ttmlContent || '').then(() => setStatus('Copied!', 'ok'));
 }
 
 const downloadTTML = function() {
   if (!window._ttmlContent) return;
-  const blob = new Blob([window._ttmlContent], { type: 'application/ttml+xml' });
+  const blob = new Blob([window._ttmlContent], { type: window._exportMime || 'application/ttml+xml' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `${songTitle}.ttml`;
+  a.download = window._exportFilename || `${songTitle}.ttml`;
   a.click();
 }
 
@@ -3559,7 +4171,7 @@ document.addEventListener('keyup', (e) => {
   }
 });
 
-// Drag & drop on upload zone
+// Drag & drop on upload zone (audio or video, auto-detected)
 const zone = document.getElementById('uploadZone');
 zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
 zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
@@ -3567,12 +4179,9 @@ zone.addEventListener('drop', e => {
   e.preventDefault();
   zone.classList.remove('dragover');
   const file = e.dataTransfer.files[0];
-  if (file && file.type.startsWith('audio/')) {
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    document.getElementById('audioFile').files = dt.files;
-    loadAudio(document.getElementById('audioFile'));
-  }
+  if (!file) return;
+  if (file.type.startsWith('video/')) loadVideoFile(file);
+  else if (file.type.startsWith('audio/')) loadAudioFile(file);
 });
 
 // Pre-fill lyrics from the provided text
@@ -3581,6 +4190,13 @@ const defaultLyrics = `This is a sample of the lyrics
 Oh-oh`;
 
 document.getElementById('lyricsInput').value = defaultLyrics;
+
+// Subtitle-mode export button shares the same readiness state as #exportBtn
+const _exportBtnObserver = new MutationObserver(() => {
+  const disabled = document.getElementById('exportBtn').disabled;
+  document.getElementById('exportSubtitleBtn').disabled = disabled;
+});
+_exportBtnObserver.observe(document.getElementById('exportBtn'), { attributes: true, attributeFilter: ['disabled'] });
 
 // ─── TEXTAREA CHANGE DETECTION FOR LOAD/UPDATE BTN ───────────────────────────
 document.getElementById('lyricsInput').addEventListener('input', () => updateLoadBtnState('loadLyricsBtn', words.some(w => w.begin !== null)));
@@ -3895,28 +4511,37 @@ const TRANSLATIONS = {
     'undo-btn': '↩ UNDO',
     'reset-btn': '⟳ RESET',
     'export-btn': 'EXPORT TTML',
-    's01-label': '01 — Audio File',
-    'upload-p': 'Drop audio file here<br>or click to browse',
-    's02-label': '02 — Import TTML',
+    'export-btn-subtitle': 'EXPORT SUBTITLE',
+    'info-tab-mode': 'Select Mode',
+    'mode-tab-ttml': 'TTML Mode',
+    'mode-tab-subtitle': 'Subtitle Mode',
+    'mode-desc-ttml': 'Standard TTML/XML export . import, best for lyric-video renderers and general TTML-based pipelines.',
+    'mode-desc-subtitle': 'YouTube-style captioning . export/import as <b>.ass</b> or YouTube\'s own subtitle format, with per-line color for karaoke-style captions.',
+    's01-label': '01 . Audio File',
+    'upload-p': 'Drop audio or video file here<br>or click to browse',
+    'youtube-link-divider': 'or paste a YouTube link',
+    's02-label': '02 . Import TTML',
+    's02-label-subtitle': '02 . Import Subtitle',
     'ttml-p': 'Drop .ttml file here<br>or click to browse',
-    'playback-handle': '⠿ 03 — Playback',
-    's03-playback-label': '03 — Playback',
+    'ttml-p-subtitle': 'Drop .ttml, .ass or YouTube caption file here<br>or click to browse',
+    'playback-handle': '⠿ 03 . Playback',
+    's03-playback-label': '03 . Playback',
     'hold-space-hint': 'HOLD SPACE / ↓ to sync line',
-    's04-label': '04 — Lyrics',
+    's04-label': '04 . Lyrics',
     'lyrics-placeholder': 'Paste lyrics here...',
     'load-lyrics-btn': 'LOAD LYRICS',
-    's05-label': '05 — Additional Lyrics',
+    's05-label': '05 . Additional Lyrics',
     'rv-placeholder': 'Paste right-side lyrics here...',
     'load-rv-btn': 'LOAD ADDITIONAL LYRICS',
-    's06-label': '06 — Backing Vocal',
+    's06-label': '06 . Backing Vocal',
     'bv-placeholder': 'Paste backing vocal lyrics here...',
     'load-bv-btn': 'LOAD BACKING VOCAL',
     'credits-label': 'Credits',
-    'tab-lyric': '04 — LYRIC SYNC',
-    'tab-rv': '05 — ADDITIONAL LYRICS',
-    'tab-bv': '06 — BACKING VOCAL',
+    'tab-lyric': '04 . LYRIC SYNC',
+    'tab-rv': '05 . ADDITIONAL LYRICS',
+    'tab-bv': '06 . BACKING VOCAL',
     'empty-h3': 'Ready to Sync',
-    'empty-p': "Load audio and lyrics, then hold SPACE / ↓ while the music plays to stamp each line's timing.",
+    'empty-p': 'Load audio and lyrics, then sync here.',
     'rv-empty-h3': 'ADDITIONAL LYRICS',
     'rv-empty-p': 'Load right-side lyrics in section 04, then sync here.',
     'bv-empty-h3': 'Backing Vocal',
@@ -3937,7 +4562,7 @@ const TRANSLATIONS = {
     'other-tool-name': 'Word Level Timing Tool',
     'other-tool-desc': 'Sync lyrics at the word level.',
     'other-tool-name-rhyme': 'TTML Rhyme',
-    'other-tool-desc-rhyme': 'A game tool for TTML files — play along to lyrics like Osu!',
+    'other-tool-desc-rhyme': 'A game tool for TTML files . play along to lyrics like Osu!',
     'opt-dark': 'Default',
     'opt-ellinya': 'Ellinya',
     'modal-export-title': 'TTML Export',
@@ -3946,7 +4571,7 @@ const TRANSLATIONS = {
     'modal-download': '⬇ DOWNLOAD .ttml',
     'import-modal-title': 'Import TTML',
     'import-modal-p1': 'Do you want to <b style="color:var(--s06-color);">keep the timing</b> from the TTML file?',
-    'import-modal-p2': '— <b>Yes</b>: Lyrics will be included with full timing (already synced).<br>— <b>No</b>: Keep only plain text, without timing.',
+    'import-modal-p2': '. <b>Yes</b>: Lyrics will be included with full timing (already synced).<br>. <b>No</b>: Keep only plain text, without timing.',
     'import-yes': '✓ Yes',
     'import-no': '✕ No',
     'sync-pad-label': 'Sync Pad',
@@ -3956,28 +4581,37 @@ const TRANSLATIONS = {
     'undo-btn': '↩ HOÀN TÁC',
     'reset-btn': '⟳ ĐẶT LẠI',
     'export-btn': 'XUẤT TTML',
-    's01-label': '01 — Tệp Âm Thanh',
-    'upload-p': 'Thả tệp âm thanh vào đây<br>hoặc nhấp để duyệt',
-    's02-label': '02 — Nhập TTML',
+    'export-btn-subtitle': 'XUẤT PHỤ ĐỀ',
+    'info-tab-mode': 'Chọn Chế Độ',
+    'mode-tab-ttml': 'Chế Độ TTML',
+    'mode-tab-subtitle': 'Chế Độ Phụ Đề',
+    'mode-desc-ttml': 'Xuất/nhập TTML/XML chuẩn, phù hợp với trình phát lyric-video và các quy trình dựa trên TTML.',
+    'mode-desc-subtitle': 'Đóng phụ đề kiểu YouTube . xuất/nhập dưới dạng <b>.ass</b> hoặc định dạng phụ đề gốc của YouTube, kèm màu riêng từng dòng cho hiệu ứng karaoke.',
+    's01-label': '01 . Tệp Âm Thanh',
+    'upload-p': 'Thả tệp âm thanh hoặc video vào đây<br>hoặc nhấp để duyệt',
+    'youtube-link-divider': 'hoặc dán link YouTube',
+    's02-label': '02 . Nhập TTML',
+    's02-label-subtitle': '02 . Nhập Phụ Đề',
     'ttml-p': 'Thả tệp .ttml vào đây<br>hoặc nhấp để duyệt',
-    'playback-handle': '⠿ 03 — Phát Nhạc',
-    's03-playback-label': '03 — Phát Nhạc',
+    'ttml-p-subtitle': 'Thả tệp .ttml, .ass hoặc phụ đề YouTube vào đây<br>hoặc nhấp để duyệt',
+    'playback-handle': '⠿ 03 . Phát Nhạc',
+    's03-playback-label': '03 . Phát Nhạc',
     'hold-space-hint': 'GIỮ SPACE / ↓ để đồng bộ dòng',
-    's04-label': '04 — Lời Bài Hát',
+    's04-label': '04 . Lời Bài Hát',
     'lyrics-placeholder': 'Dán lời bài hát vào đây...',
     'load-lyrics-btn': 'TẢI LỜI BÀI HÁT',
-    's05-label': '05 — Lời Phụ',
+    's05-label': '05 . Lời Phụ',
     'rv-placeholder': 'Dán lời phụ vào đây...',
     'load-rv-btn': 'TẢI LỜI PHỤ',
-    's06-label': '06 — Giọng Nền',
+    's06-label': '06 . Giọng Nền',
     'bv-placeholder': 'Dán lời giọng nền vào đây...',
     'load-bv-btn': 'TẢI GIỌNG NỀN',
     'credits-label': 'Thông Tin',
-    'tab-lyric': '04 — ĐỒNG BỘ LỜI',
-    'tab-rv': '05 — LỜI PHỤ',
-    'tab-bv': '06 — GIỌNG NỀN',
+    'tab-lyric': '04 . ĐỒNG BỘ LỜI',
+    'tab-rv': '05 . LỜI PHỤ',
+    'tab-bv': '06 . GIỌNG NỀN',
     'empty-h3': 'Sẵn Sàng Đồng Bộ',
-    'empty-p': 'Tải âm thanh và lời bài hát, sau đó giữ SPACE / ↓ trong khi nhạc phát để đánh dấu thời điểm từng dòng.',
+    'empty-p': 'Tải âm thanh và lời bài hát, sau đó đồng bộ tại đây.',
     'rv-empty-h3': 'LỜI PHỤ',
     'rv-empty-p': 'Tải lời phụ ở mục 04, sau đó đồng bộ tại đây.',
     'bv-empty-h3': 'Giọng Nền',
@@ -3998,7 +4632,7 @@ const TRANSLATIONS = {
     'other-tool-name': 'Công Cụ Định Thời Theo Từ',
     'other-tool-desc': 'Đồng bộ lời bài hát theo từng từ.',
     'other-tool-name-rhyme': 'TTML Rhyme',
-    'other-tool-desc-rhyme': 'Công cụ chơi game với file TTML — chơi theo lời bài hát như Osu!',
+    'other-tool-desc-rhyme': 'Công cụ chơi game với file TTML . chơi theo lời bài hát như Osu!',
     'opt-dark': 'Mặc Định',
     'opt-ellinya': 'Ellinya',
     'modal-export-title': 'Xuất TTML',
@@ -4007,7 +4641,7 @@ const TRANSLATIONS = {
     'modal-download': '⬇ TẢI XUỐNG .ttml',
     'import-modal-title': 'Nhập TTML',
     'import-modal-p1': 'Bạn có muốn <b style="color:var(--s06-color);">giữ lại thời gian</b> từ tệp TTML không?',
-    'import-modal-p2': '— <b>Có</b>: Lời sẽ được đưa vào kèm thời gian đầy đủ (đã đồng bộ).<br>— <b>Không</b>: Chỉ giữ văn bản thuần, không có thời gian.',
+    'import-modal-p2': '. <b>Có</b>: Lời sẽ được đưa vào kèm thời gian đầy đủ (đã đồng bộ).<br>. <b>Không</b>: Chỉ giữ văn bản thuần, không có thời gian.',
     'import-yes': '✓ Có',
     'import-no': '✕ Không',
     'sync-pad-label': 'Bàn Đồng Bộ',
@@ -4015,6 +4649,20 @@ const TRANSLATIONS = {
 };
 
 let currentLang = 'en';
+
+function setAppMode(mode) {
+  appMode = mode;
+  document.getElementById('modeBtnTtml').classList.toggle('active', mode === 'ttml');
+  document.getElementById('modeBtnSubtitle').classList.toggle('active', mode === 'subtitle');
+  document.getElementById('modeDescTtml').style.display = mode === 'ttml' ? 'block' : 'none';
+  document.getElementById('modeDescSubtitle').style.display = mode === 'subtitle' ? 'block' : 'none';
+  document.body.classList.toggle('subtitle-mode', mode === 'subtitle');
+  document.getElementById('exportBtn').style.display = mode === 'subtitle' ? 'none' : '';
+  document.getElementById('exportSubtitleBtn').style.display = mode === 'subtitle' ? '' : 'none';
+  document.getElementById('ttmlImportFile').setAttribute('accept',
+    mode === 'subtitle' ? '.ttml,.xml,.ass,.ytt,.srv3' : '.ttml,.xml');
+  applyTranslations(currentLang);
+}
 
 function applyTranslations(lang) {
   const t = TRANSLATIONS[lang];
@@ -4031,7 +4679,7 @@ function applyTranslations(lang) {
   const resetBtn = document.getElementById('resetBtn');
   if (resetBtn) resetBtn.innerHTML = t['reset-btn'];
   const exportBtn = document.getElementById('exportBtn');
-  if (exportBtn) exportBtn.textContent = t['export-btn'];
+  if (exportBtn) exportBtn.textContent = t[appMode === 'subtitle' ? 'export-btn-subtitle' : 'export-btn'];
   // Theme options
   const optDark = document.getElementById('opt-dark');
   if (optDark) optDark.innerHTML = '<span class="theme-dot" style="background:#e0e0e0;border:1px solid #555;"></span> ' + t['opt-dark'];
@@ -4041,7 +4689,7 @@ function applyTranslations(lang) {
   document.querySelectorAll('.section-label').forEach(el => {
     const txt = el.textContent.trim();
     if (txt.startsWith('01')) el.textContent = t['s01-label'];
-    else if (txt.startsWith('02')) el.textContent = t['s02-label'];
+    else if (txt.startsWith('02')) el.textContent = t[appMode === 'subtitle' ? 's02-label-subtitle' : 's02-label'];
     else if (txt.startsWith('03')) el.textContent = t['s03-playback-label'];
     else if (txt.startsWith('04')) el.textContent = t['s04-label'];
     else if (txt.startsWith('05')) el.textContent = t['s05-label'];
@@ -4051,8 +4699,10 @@ function applyTranslations(lang) {
   // Upload zones
   const uploadZone = document.querySelector('#uploadZone p');
   if (uploadZone) uploadZone.innerHTML = t['upload-p'];
+  const ytDivider = document.getElementById('youtubeLinkDivider');
+  if (ytDivider) ytDivider.textContent = t['youtube-link-divider'];
   const ttmlZone = document.querySelector('#ttmlImportZone p');
-  if (ttmlZone) ttmlZone.innerHTML = t['ttml-p'];
+  if (ttmlZone) ttmlZone.innerHTML = t[appMode === 'subtitle' ? 'ttml-p-subtitle' : 'ttml-p'];
   // Playback drag handle
   const handle = document.getElementById('playbackDragHandle');
   if (handle) handle.textContent = t['playback-handle'];
@@ -4121,8 +4771,10 @@ function applyTranslations(lang) {
         const isLinePanel = bar.closest('#panel-lyric') !== null;
         span.textContent = isLinePanel ? t['key-dblclick-line'] : t['key-dblclick-word'];
       }
-      else if (keyTxt === 'CLICK (done line)') span.textContent = t['key-click-done-line'];
-      else if (keyTxt === 'CLICK (done)') span.textContent = t['key-click-done-word'];
+      else if (keyTxt === 'CLICK (done)') {
+        const isLinePanel = bar.closest('#panel-lyric') !== null;
+        span.textContent = isLinePanel ? t['key-click-done-line'] : t['key-click-done-word'];
+      }
     });
   });
   // Mobile shared instruction bar
@@ -4144,8 +4796,18 @@ function applyTranslations(lang) {
   // Info panel tabs
   document.querySelectorAll('.info-panel-tab').forEach(tab => {
     if (tab.dataset.tab === 'how-to-use') tab.textContent = t['info-tab-how'];
+    if (tab.dataset.tab === 'select-mode') tab.textContent = t['info-tab-mode'];
     if (tab.dataset.tab === 'other-tools') tab.textContent = t['info-tab-other'];
   });
+  // Select Mode tab content
+  const modeBtnTtml = document.getElementById('modeBtnTtml');
+  if (modeBtnTtml) modeBtnTtml.textContent = t['mode-tab-ttml'];
+  const modeBtnSubtitle = document.getElementById('modeBtnSubtitle');
+  if (modeBtnSubtitle) modeBtnSubtitle.textContent = t['mode-tab-subtitle'];
+  const modeDescTtml = document.getElementById('modeDescTtml');
+  if (modeDescTtml) modeDescTtml.innerHTML = t['mode-desc-ttml'];
+  const modeDescSubtitle = document.getElementById('modeDescSubtitle');
+  if (modeDescSubtitle) modeDescSubtitle.innerHTML = t['mode-desc-subtitle'];
   // Info panel content
   const infoDescEl = document.querySelector('[data-tab="how-to-use"] .info-panel-item:first-child span');
   if (infoDescEl) infoDescEl.innerHTML = t['info-desc'];
@@ -4208,9 +4870,6 @@ document.addEventListener('click', (e) => {
   if (!document.getElementById('themePickerWrapper').contains(e.target)) {
     closeThemeDropdown();
   }
-  if (!document.getElementById('infoWrapper').contains(e.target)) {
-    hideInfoPanel();
-  }
   if (!document.getElementById('langPickerWrapper').contains(e.target)) {
     closeLangDropdown();
   }
@@ -4221,18 +4880,12 @@ document.addEventListener('click', (e) => {
   }
 });
 
-let infoPanelOpen = false;
 function switchInfoTab(tab) {
   document.querySelectorAll('.info-panel-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.info-tab-content').forEach(c => c.classList.toggle('active', c.dataset.tab === tab));
 }
-function showInfoPanel() { switchInfoTab('how-to-use'); document.getElementById('infoPanel').classList.add('visible'); }
-function hideInfoPanel() { if (!infoPanelOpen) document.getElementById('infoPanel').classList.remove('visible'); }
-function toggleInfoPanel() {
-  infoPanelOpen = !infoPanelOpen;
-  if (infoPanelOpen) switchInfoTab('how-to-use');
-  document.getElementById('infoPanel').classList.toggle('visible', infoPanelOpen);
-}
+function showInfoPanel() { document.getElementById('infoPanel').classList.add('visible'); }
+function hideInfoPanel() { document.getElementById('infoPanel').classList.remove('visible'); }
 </script>
 <div id="toastNotif"></div>
 </body>
