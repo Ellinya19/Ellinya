@@ -1362,7 +1362,7 @@
 
     <div class="stats-bar" id="statsBar"></div>
 
-    <div class="lyrics-input-area">
+    <div class="lyrics-input-area" id="rvInputArea">
       <div class="section-label" style="color:var(--s04-color);">05 . Additional Lyrics</div>
       <textarea class="lyrics-textarea" id="rvInput" placeholder="Paste right-side lyrics here..." style="border-color:color-mix(in srgb, var(--rv-color) 30%, transparent);"></textarea>
       <div style="margin-top: 12px; display: flex; gap: 8px;">
@@ -1371,7 +1371,7 @@
       <div class="stats-bar" id="rvStatsBar" style="margin-top:10px;"></div>
     </div>
 
-    <div class="lyrics-input-area">
+    <div class="lyrics-input-area" id="bvInputArea">
       <div class="section-label" style="color:var(--s05-color);">06 . Backing Vocal</div>
       <textarea class="lyrics-textarea" id="bvInput" placeholder="Paste backing vocal lyrics here..." style="border-color:color-mix(in srgb, var(--accent) 30%, transparent);"></textarea>
       <div style="margin-top: 12px; display: flex; gap: 8px;">
@@ -3990,10 +3990,10 @@ function assTimeToSec(t) {
 }
 
 // ─── .ASS EXPORT (Subtitle Mode) ───────────────────────────────────────────────
+// Subtitle Mode has no concept of Additional Lyrics / Backing Vocal (YouTube
+// captions don't support that), so only the main lyrics are exported.
 function buildASSContent() {
   const stamped = words.filter(w => w.begin !== null);
-  const rvStamped = rvWords.filter(w => w.begin !== null);
-  const bvStamped = bvWords.filter(w => w.begin !== null);
 
   function lineDialogues(wordsArr, styleName) {
     return groupWordsByLineIndex(wordsArr).map(lineWords => {
@@ -4011,11 +4011,7 @@ function buildASSContent() {
     });
   }
 
-  const events = [
-    ...lineDialogues(stamped, 'Default'),
-    ...lineDialogues(rvStamped, 'RV'),
-    ...lineDialogues(bvStamped, 'BV')
-  ].join('\n');
+  const events = lineDialogues(stamped, 'Default').join('\n');
 
   return `[Script Info]
 Title: ${songTitle}
@@ -4028,8 +4024,6 @@ PlayResY: 288
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,Arial,28,&H00FFFFFF,&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,2,1,2,10,10,10,1
-Style: RV,Arial,24,&H00FFFFFF,&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,2,1,2,10,10,40,1
-Style: BV,Arial,20,&H00CCCCCC,&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,1,1,2,10,10,70,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -4039,12 +4033,8 @@ ${events}
 
 function checkSubtitleReady() {
   const stamped = words.filter(w => w.begin !== null);
-  const bvStampedCheck = bvWords.filter(w => w.begin !== null);
-  const rvStampedCheck = rvWords.filter(w => w.begin !== null);
-  if (stamped.length === 0 && bvStampedCheck.length === 0 && rvStampedCheck.length === 0) { setStatus('Nothing to export', 'err'); return false; }
-  if (bvWords.length > 0 && (!bvEndSyncStamped || bvStampedCheck.length < bvWords.length)) { setStatus('Backing Vocal not fully synced . please complete it before exporting!', 'err'); return false; }
-  if (rvWords.length > 0 && (!rvEndSyncStamped || rvStampedCheck.length < rvWords.length)) { setStatus('Additional Lyrics not fully synced . please complete it before exporting!', 'err'); return false; }
-  if (words.length > 0 && (!endSyncStamped || stamped.length < words.length)) { setStatus('Main lyrics not fully synced . please complete it before exporting!', 'err'); return false; }
+  if (stamped.length === 0) { setStatus('Nothing to export', 'err'); return false; }
+  if (!endSyncStamped || stamped.length < words.length) { setStatus('Main lyrics not fully synced . please complete it before exporting!', 'err'); return false; }
   return true;
 }
 
@@ -4078,10 +4068,10 @@ function downloadSubtitleAs(fmt) {
 // custom `role` attribute this tool uses to tell main/RV/BV lines apart on
 // re-import. It is meant for round-tripping inside this tool, not guaranteed
 // to be byte-identical to what YouTube's own caption pipeline generates.
+// Subtitle Mode has no Additional Lyrics / Backing Vocal, so only the main
+// lyrics are exported (YouTube captions don't support that concept either).
 function buildYTTContent() {
   const stamped = words.filter(w => w.begin !== null);
-  const rvStamped = rvWords.filter(w => w.begin !== null);
-  const bvStamped = bvWords.filter(w => w.begin !== null);
 
   function lineParagraphs(wordsArr, role) {
     return groupWordsByLineIndex(wordsArr).map(lineWords => {
@@ -4099,11 +4089,7 @@ function buildYTTContent() {
     });
   }
 
-  const paragraphs = [
-    ...lineParagraphs(stamped, 'main'),
-    ...lineParagraphs(rvStamped, 'rv'),
-    ...lineParagraphs(bvStamped, 'bv')
-  ].join('\n');
+  const paragraphs = lineParagraphs(stamped, 'main').join('\n');
 
   return `<?xml version="1.0" encoding="utf-8"?>
 <timedtext format="3">
@@ -4120,7 +4106,7 @@ ${paragraphs}
 // ─── .ASS IMPORT ────────────────────────────────────────────────────────────
 function parseASSContent(text, keepTiming) {
   try {
-    const mainLines = [], rvLines = [], bvLines = [];
+    const mainLines = [];
     const lines = text.split(/\r?\n/);
     let inEvents = false;
     let fieldOrder = ['Layer', 'Start', 'End', 'Style', 'Name', 'MarginL', 'MarginR', 'MarginV', 'Effect', 'Text'];
@@ -4167,12 +4153,12 @@ function parseASSContent(text, keepTiming) {
       }
       if (!tokens.length) return;
 
-      if (styleName === 'RV') rvLines.push(tokens);
-      else if (styleName === 'BV') bvLines.push(tokens);
-      else mainLines.push(tokens);
+      // Subtitle Mode has no Additional Lyrics / Backing Vocal . anything not
+      // the Default style (e.g. from an older export) is simply dropped.
+      if (styleName === 'Default' || !styleName) mainLines.push(tokens);
     });
 
-    applyParsedLines(mainLines, rvLines, bvLines, keepTiming);
+    applyParsedLines(mainLines, [], [], keepTiming);
   } catch (err) {
     console.error(err);
     document.getElementById('importStatusMsg').textContent = '✗ Lỗi parse ASS: ' + err.message;
@@ -4186,7 +4172,7 @@ function parseYTTContent(text, keepTiming) {
     const doc = parser.parseFromString(text, 'application/xml');
     const pEls = Array.from(doc.querySelectorAll('p'));
 
-    const mainLines = [], rvLines = [], bvLines = [];
+    const mainLines = [];
 
     pEls.forEach(p => {
       const role = (p.getAttribute('role') || 'main').toLowerCase();
@@ -4209,12 +4195,12 @@ function parseYTTContent(text, keepTiming) {
         tokens = rawText ? rawText.split(/\s+/).map(w => ({ text: w, noSpaceBefore: false, color: null })) : [];
       }
       if (!tokens.length) return;
-      if (role === 'rv') rvLines.push(tokens);
-      else if (role === 'bv') bvLines.push(tokens);
-      else mainLines.push(tokens);
+      // Subtitle Mode has no Additional Lyrics / Backing Vocal . anything not
+      // role="main" (e.g. from an older export) is simply dropped.
+      if (role === 'main') mainLines.push(tokens);
     });
 
-    applyParsedLines(mainLines, rvLines, bvLines, keepTiming);
+    applyParsedLines(mainLines, [], [], keepTiming);
   } catch (err) {
     console.error(err);
     document.getElementById('importStatusMsg').textContent = '✗ Lỗi parse YTT: ' + err.message;
@@ -4791,6 +4777,11 @@ function setAppMode(mode) {
   document.body.classList.toggle('subtitle-mode', mode === 'subtitle');
   document.getElementById('exportBtn').style.display = mode === 'subtitle' ? 'none' : '';
   document.getElementById('exportSubtitleBtn').style.display = mode === 'subtitle' ? '' : 'none';
+  document.getElementById('rvInputArea').style.display = mode === 'subtitle' ? 'none' : '';
+  document.getElementById('bvInputArea').style.display = mode === 'subtitle' ? 'none' : '';
+  document.getElementById('tab-rv').style.display = mode === 'subtitle' ? 'none' : '';
+  document.getElementById('tab-bv').style.display = mode === 'subtitle' ? 'none' : '';
+  if (mode === 'subtitle') switchTab('lyric');
   document.getElementById('ttmlImportFile').setAttribute('accept',
     mode === 'subtitle' ? '.ttml,.xml,.ass,.ytt,.srv3' : '.ttml,.xml');
   applyTranslations(currentLang);
